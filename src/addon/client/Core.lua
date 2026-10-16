@@ -5,7 +5,6 @@
 -- /hfwm             - toggle on / off
 -- /hfwm on|off      - explicit enable / disable
 -- /hfwm bg NAME     - map background: default | ocean | hybrid
--- /hfwm options     - open the options panel
 -- /hfwm cave        - the cave map window (on|off|show|hide|reset|alpha N|indoors)
 -- /hfwm remember    - remember world map zoom+pan across close/reopen
 -- /hfwm zoom        - additional (closer) world map zoom levels
@@ -166,7 +165,7 @@ function addon:OnEnable()
     -- After Commands, so a Lua error while probing the client's options
     -- APIs still leaves the slash commands working.
     Options:Init()
-    P("Loaded. /hfwm to toggle, /hfwm options for settings.")
+    P("Loaded. /hfwm to toggle; settings are in Esc > Options > AddOns.")
 end
 
 --- Warm the texture cache for the player's zone (Renderer:Preload), on

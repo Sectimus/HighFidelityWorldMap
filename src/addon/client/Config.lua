@@ -130,16 +130,24 @@ Config.DEFAULTS = {
     showPlayerCoords = true,
     showMouseCoords  = true,
 
-    -- "Extra Labels" (MapLabels.lua): names drawn on the map over its art.
-    -- Location Names: towns and places such as Ironforge.
-    showLocationNames = true,
-    -- Label Scale: multiplier (0.5..2) on the size of every extra label, set
-    -- in Options. See MapLabels.lua's Layout.
+    -- Labels (MapLabels.lua): names drawn on the map over its art, in three
+    -- groups: continent names, capital cities, and towns and hubs.
+    showContinentNames = true,
+    showCapitalCities = true,
+    showTownsHubs = true,
+    -- Global label scale: multiplier (0.5..2) on every label, set in Options.
+    -- Multiplies each type's own scale below. See MapLabels.lua's Layout.
     labelScale = 1,
-    -- Auto-scale (Extra Labels): labels grow as you zoom out and shrink as you
-    -- zoom in, from their Label Scale size at the loosest zoom step. See
+    -- Per-type label scales (0.5..2), each on top of labelScale.
+    continentLabelScale = 1,
+    capitalLabelScale = 1,
+    townLabelScale = 1,
+    -- Auto-scale per label type: labels grow as you zoom out and shrink as you
+    -- zoom in, from their label scale at the loosest zoom step. See
     -- MapLabels.lua's LabelScale.
-    labelAutoScale = false,
+    continentAutoScale = false,
+    capitalAutoScale = false,
+    townAutoScale = false,
     -- "Show on SD" (Options): labels stay fully visible across the whole HD/SD
     -- blend, not just its HD half. See MapLabels' LabelAlpha.
     labelShowOnSD = false,
