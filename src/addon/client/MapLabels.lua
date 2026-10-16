@@ -31,13 +31,29 @@ local frame
 local labelTextures = {}
 
 --- Show label *label* centred on (x, y) from the canvas's top-left.
-local function Layout(tex, label, x, y)
+local function Layout(tex, label, x, y, scale)
     tex:SetTexture("Interface\\AddOns\\" .. addonName .. "\\Assets\\"
         .. label.texture .. ".tga")
-    tex:SetSize(label.w, label.h)
+    tex:SetSize(label.w * scale, label.h * scale)
     tex:ClearAllPoints()
     tex:SetPoint("CENTER", frame, "TOPLEFT", x, y)
     tex:Show()
+end
+
+--- Size multiplier for the labels now: the Label Scale slider, times the
+--- inverse of the canvas zoom against its loosest step when Auto-scale is on.
+--- The art and the labels both scale with the canvas, so zooming out shrinks a
+--- label on screen; Auto-scale grows it back by that ratio, and zooming in
+--- shrinks it.
+local function LabelScale()
+    local scale = Config.db.labelScale
+    if not Config.db.labelAutoScale then return scale end
+    local sc = WorldMapFrame.ScrollContainer
+    local levels = sc and sc.zoomLevels
+    local base = levels and levels[1] and levels[1].scale
+    local cur = sc and sc.currentScale
+    if base and cur and cur > 0 then scale = scale * base / cur end
+    return scale
 end
 
 --- Show or hide the labels for the map now on screen. Safe to call at any
@@ -46,6 +62,8 @@ function MapLabels:Refresh()
     local canvas = WorldMapFrame.ScrollContainer
         and WorldMapFrame.ScrollContainer.Child
     local labels = canvas and Config.db.enabled and Config.db.showLocationNames
+        -- HD only, as ToggleButton's HDShowing reads it, unless Show on SD.
+        and (Config.db.labelShowOnSD or Config:GetAlpha() > 0.5)
         and LOCATION_NAMES[WorldMapFrame:GetMapID() or 0]
     if not labels then
         if frame then frame:Hide() end
@@ -66,7 +84,15 @@ function MapLabels:Refresh()
     local w, h = canvas:GetSize()
     for i, label in ipairs(labels) do
         labelTextures[i] = labelTextures[i] or frame:CreateTexture(nil, "ARTWORK")
-        Layout(labelTextures[i], label, label.u * w, -label.v * h)
+        Layout(labelTextures[i], label, label.u * w, -label.v * h, LabelScale())
     end
     for i = #labels + 1, #labelTextures do labelTextures[i]:Hide() end
+end
+
+--- Re-lay the labels on every canvas zoom step, for Auto-scale. Called once
+--- from Core.lua's PLAYER_LOGIN handler, same timing as the other modules.
+function MapLabels:Start()
+    local sc = WorldMapFrame.ScrollContainer
+    if not sc or not sc.OnCanvasScaleChanged then return end
+    hooksecurefunc(sc, "OnCanvasScaleChanged", function() MapLabels:Refresh() end)
 end

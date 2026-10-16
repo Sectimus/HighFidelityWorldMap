@@ -311,26 +311,6 @@ local options = {
                 ns.Coords:Refresh()
             end,
         },
-        extraLabels = {
-            order = 59,
-            type = "group",
-            inline = true,
-            name = "Extra Labels",
-            args = {
-                showLocationNames = {
-                    order = 10,
-                    type = "toggle",
-                    name = "Location Names",
-                    desc = "Shows the names of towns and other places on "
-                        .. "the world map, such as Ironforge.",
-                    get = function() return Config.db.showLocationNames end,
-                    set = function(_, value)
-                        Config.db.showLocationNames = value
-                        ns.MapLabels:Refresh()
-                    end,
-                },
-            },
-        },
 
         toggleButtonEnabled = {
             order = 72,
@@ -365,8 +345,8 @@ local options = {
             type = "group",
             inline = true,
             -- Boxed section, same treatment as Cave map just below it --
-            -- not a tab under Profiles' tree, and placed directly above
-            -- Cave map since it matters more.
+            -- not a tab under Profiles' tree, and placed above Cave map since
+            -- it matters more.
             name = "Map Background",
             args = {
                 globalBackground = {
@@ -384,6 +364,67 @@ local options = {
                 -- Zone/World/Continent Map dropdowns, stacked below Global
                 -- Background, filled in just after this table from
                 -- Config.MAP_TYPES.
+            },
+        },
+        extraLabels = {
+            order = 76,
+            type = "group",
+            inline = true,
+            name = "Extra Labels",
+            args = {
+                showLocationNames = {
+                    order = 10,
+                    type = "toggle",
+                    name = "Location Names",
+                    desc = "Shows the names of towns and other places on "
+                        .. "the world map, such as Ironforge.",
+                    get = function() return Config.db.showLocationNames end,
+                    set = function(_, value)
+                        Config.db.showLocationNames = value
+                        ns.MapLabels:Refresh()
+                    end,
+                },
+                labelShowOnSD = {
+                    order = 12,
+                    type = "toggle",
+                    name = "Show on SD",
+                    desc = "Keeps the extra labels visible when the map is "
+                        .. "showing SD tiles. Off, they show only on HD.",
+                    disabled = function() return not Config.db.showLocationNames end,
+                    get = function() return Config.db.labelShowOnSD end,
+                    set = function(_, value)
+                        Config.db.labelShowOnSD = value
+                        ns.MapLabels:Refresh()
+                    end,
+                },
+                labelAutoScale = {
+                    order = 15,
+                    type = "toggle",
+                    name = "Auto-scale",
+                    desc = "Grows the extra labels as you zoom out and shrinks "
+                        .. "them as you zoom in, starting from the Label Scale "
+                        .. "size at the loosest zoom.",
+                    disabled = function() return not Config.db.showLocationNames end,
+                    get = function() return Config.db.labelAutoScale end,
+                    set = function(_, value)
+                        Config.db.labelAutoScale = value
+                        ns.MapLabels:Refresh()
+                    end,
+                },
+                labelScale = {
+                    order = 20,
+                    type = "range",
+                    name = "Label Scale",
+                    desc = "Size of the extra map labels, such as Ironforge, "
+                        .. "as a multiple of their default size.",
+                    min = 0.5, max = 2, step = 0.05, isPercent = true,
+                    disabled = function() return not Config.db.showLocationNames end,
+                    get = function() return Config.db.labelScale end,
+                    set = function(_, value)
+                        Config.db.labelScale = value
+                        ns.MapLabels:Refresh()
+                    end,
+                },
             },
         },
         cave = {

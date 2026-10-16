@@ -133,6 +133,16 @@ Config.DEFAULTS = {
     -- "Extra Labels" (MapLabels.lua): names drawn on the map over its art.
     -- Location Names: towns and places such as Ironforge.
     showLocationNames = true,
+    -- Label Scale: multiplier (0.5..2) on the size of every extra label, set
+    -- in Options. See MapLabels.lua's Layout.
+    labelScale = 1,
+    -- Auto-scale (Extra Labels): labels grow as you zoom out and shrink as you
+    -- zoom in, from their Label Scale size at the loosest zoom step. See
+    -- MapLabels.lua's LabelScale.
+    labelAutoScale = false,
+    -- "Show on SD" (Options): keeps the extra labels up while the map is
+    -- showing SD tiles. Off, they show only while the HD side dominates.
+    labelShowOnSD = false,
 }
 -- The db also carries `caveWindowPoint` -- { left, top }, the window's
 -- TOPLEFT in UIParent units -- written by CaveRenderer when the window is
