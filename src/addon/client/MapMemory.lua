@@ -8,50 +8,44 @@
 -- Config.DEFAULTS.rememberMapZoomPan; toggle from Options or
 -- `/hfwm remember on|off`.
 --
--- Save: a pre-hook on the map's ScrollContainer OnHide (like
--- PersistentWorldMap's restoreAndReset.lua; must be a *pre*-hook since a
--- normal HookScript OnHide runs too late relative to the container tearing
--- down), reading the same three fields PersistentWorldMap reads
--- (currentScale / currentScrollX / currentScrollY) straight off the
--- ScrollContainer, tagged with the mapID they belong to. Method-call
--- equivalents (GetCanvasScale etc.) are tried first, field as fallback,
--- same as this addon's other client-version-sensitive APIs (see
--- Options.lua's CreateFrameTry/SubElement).
+-- Save: sampled every frame while the map is shown (an OnUpdate on a frame
+-- hanging off the map), reading the same three values PersistentWorldMap
+-- reads (scale / scroll X / scroll Y) off the ScrollContainer, tagged with
+-- the mapID they belong to. Sampling rather than a pre-hook on the
+-- container's OnHide (which nils those fields): replacing Blizzard's script
+-- runs it from addon code, tainting everything it writes. Method-call
+-- equivalents (GetCanvasScale etc.) are tried first, field as fallback.
 --
 -- Restore: a post-hook on ToggleWorldMap and ToggleQuestLog. WorldMapFrame's
 -- own OnShow fires before mapID and layout have settled (PersistentWorldMap
 -- calls this out explicitly), so the toggle functions are the reliable
--- point, not HookScript("OnShow", ...). Restoring forces the map back to
--- the remembered mapID (undoing the client's own reset-to-current-zone),
--- then instantly pans/zooms to the remembered position.
+-- point, not HookScript("OnShow", ...). Restores only when the map the
+-- client opened is the one that was remembered, then instantly pans/zooms
+-- to the remembered position. It never changes the map itself: SetMapID
+-- from addon code taints WorldMapFrame.mapID for good, every data provider
+-- reads it, and every pin created after that is tainted (clicking one
+-- trips ADDON_ACTION_FORBIDDEN, e.g. CopyToClipboard on the waypoint pin;
+-- issue #20). So a map other than the one the client opens (the player's
+-- zone) is not carried over.
 --
 -- Also restored around: the map's own quest-list side-panel toggle
 -- (WorldMapFrame.SidePanelToggle's Open/CloseButton), which resizes the
 -- canvas -- and therefore re-centers/re-zooms it -- without ever closing
--- the map, so the ToggleWorldMap/ToggleQuestLog hooks never see it.
--- PersistentWorldMap's restoreAndReset.lua hits this exact same case and
--- fixes it by wrapping those two buttons' OnClick directly (save, call
--- through, restore, all synchronously); this module does the same thing
--- rather than reinventing it, since the client's own follow-up layout code
--- runs later in that same click handler and would otherwise clobber a
--- restore attempted any earlier (e.g. from an OnSizeChanged hook).
+-- the map, so the ToggleWorldMap/ToggleQuestLog hooks never see it. A
+-- post-hook on their OnClick restores the last frame's sample once
+-- Blizzard's handler (and its re-centering) has run.
 --
--- Not reproduced: PersistentWorldMap's auto-centering, double-click,
--- recenter button and its taint-prevention module (taintPrevent.lua), which
--- exists because PersistentWorldMap permanently taints WorldMapFrame.mapID
--- and then has to patch every map pin so combat doesn't throw
--- ADDON_ACTION_BLOCKED. This module makes the same tainting write but
--- sidesteps the fallout more cheaply: skip the restore entirely while
--- InCombatLockdown() and retry once combat ends. The cost is a reopen
--- during combat briefly shows the client's own default view until
--- PLAYER_REGEN_ENABLED fires.
+-- Not reproduced: PersistentWorldMap's auto-centering, double-click and
+-- recenter button. Restoring writes WorldMapFrame.mapID and the scroll
+-- container's fields from addon code, which taints them for the session;
+-- Taint.lua contains the fallout (pins acquired in combat), engaged by the
+-- first restore.
 -------------------------------------------------------------------------------
 local addonName, ns = ...
 local Config    = ns.Config
 local MapMemory  = ns.MapMemory
 
 local WorldMapFrame    = _G.WorldMapFrame
-local InCombatLockdown = _G.InCombatLockdown
 
 -------------------------------------------------------------------------------
 -- Field access with a method-call preference, mirroring the comment above.
@@ -96,12 +90,8 @@ local savedMapID, savedScale, savedScrollX, savedScrollY
 -- has ever actually been shown this session.
 local firstShownAfterLogin = false
 
--- Set when a restore was skipped for being in combat, so it can be retried
--- the moment combat ends instead of leaving the map on the wrong view.
-local pendingRestore = false
-
--- Off under the gamepad UI: restoring calls Blizzard's InstantPanAndZoom/
--- SetMapID from addon code, which leaves the scroll container's scale and
+-- Off under the gamepad UI: restoring calls Blizzard's InstantPanAndZoom
+-- from addon code, which leaves the scroll container's scale and
 -- scroll fields tainted and breaks the map's own gamepad zoom/pan.
 local function Enabled()
     return Config.db and Config.db.rememberMapZoomPan and not Config:IsGamepadUI()
@@ -129,23 +119,16 @@ local function RestoreState()
         return
     end
 
-    if InCombatLockdown() then
-        pendingRestore = true
-        return
-    end
-    pendingRestore = false
-
-    if WorldMapFrame:GetMapID() ~= savedMapID then
-        pcall(WorldMapFrame.SetMapID, WorldMapFrame, savedMapID)
-    end
+    -- Not WorldMapFrame:OnMapChanged() afterwards: the zoom change refreshes
+    -- pins through OnCanvasScaleChanged. Each extra call from here is one
+    -- more tainted pass over every data provider and the quest log.
+    if WorldMapFrame:GetMapID() ~= savedMapID then return end
+    ns.Taint:Engage()
 
     local sc = WorldMapFrame.ScrollContainer
     if sc and sc.InstantPanAndZoom then
         pcall(sc.InstantPanAndZoom, sc, savedScale, savedScrollX, savedScrollY,
             true)
-    end
-    if WorldMapFrame.OnMapChanged then
-        pcall(WorldMapFrame.OnMapChanged, WorldMapFrame)
     end
 end
 
@@ -158,30 +141,14 @@ local function OnToggle()
     RestoreState()
 end
 
---- Wrap target for the map's own side-panel toggle buttons (the quest-list
+--- Post-hook for the map's own side-panel toggle buttons (the quest-list
 --- arrow docked to the map's edge, WorldMapFrame.SidePanelToggle.OpenButton/
---- CloseButton). Opening or closing that panel resizes the map's canvas the
---- same way showing/hiding the whole frame does, and the client's own
---- canvas layout code reacts to that resize by re-centering and re-zooming
---- the map -- the same reset this module already guards against on open,
---- just triggered by a resize instead of a hide/show, and one
---- ToggleWorldMap/ToggleQuestLog never sees since the map never closes.
----
---- Save, call through to Blizzard's own click handler, then restore --
---- all synchronously, matching PersistentWorldMap's own fix for this exact
---- button. The restore has to happen *after* the call-through, not from a
---- hook on whatever triggers the resize itself (e.g. OnSizeChanged): the
---- client's own re-centering runs as later code in that same click
---- handler, so anything that restores earlier just gets overwritten by it
---- before the handler even returns.
-local function WrapSidePanelToggleButton(btn)
-    if not btn then return end
-    local original = btn:GetScript("OnClick")
-    btn:SetScript("OnClick", function(self, ...)
-        SaveState()
-        if original then original(self, ...) end
-        RestoreState()
-    end)
+--- CloseButton). Opening or closing that panel resizes the map's canvas,
+--- and the client's canvas layout code reacts by re-centering and
+--- re-zooming it within the same click handler; this runs after that
+--- handler and puts back the view sampled on the last frame before it.
+local function HookSidePanelToggleButton(btn)
+    if btn then btn:HookScript("OnClick", RestoreState) end
 end
 
 --- Discard the remembered position without touching the enabled setting.
@@ -189,48 +156,24 @@ end
 --- off`, so flipping it back on later doesn't reapply a stale spot.
 function MapMemory:Clear()
     savedMapID, savedScale, savedScrollX, savedScrollY = nil, nil, nil, nil
-    pendingRestore = false
 end
 
 --- Wire up the hooks. Called once from Core.lua's PLAYER_LOGIN handler,
 --- after WorldMapFrame is guaranteed to exist, same timing every other
 --- module here waits for.
 function MapMemory:Start()
-    local sc = WorldMapFrame.ScrollContainer
     hooksecurefunc("ToggleWorldMap", OnToggle)
     hooksecurefunc("ToggleQuestLog", OnToggle)
 
-    -- Gamepad UI: don't replace Blizzard's OnHide/OnClick scripts below. A
-    -- replaced script runs Blizzard's original from addon code, tainting the
-    -- scroll container the gamepad zoom reads. (Decided at load; /reload
-    -- after switching input style.)
-    if Config:IsGamepadUI() then return end
+    -- Hangs off the map (or the gamepad-UI host): only runs while shown.
+    local sampler = CreateFrame("Frame", nil, Config:MapWidgetParent())
+    sampler:SetScript("OnUpdate", SaveState)
 
-    -- Pre-hook: capture whatever OnHide script is already there (Blizzard's
-    -- own, or another addon's) and still run it, same as PersistentWorldMap
-    -- does for the identical reason.
-    local otherOnHide = sc:GetScript("OnHide")
-    sc:SetScript("OnHide", function(self, ...)
-        SaveState()
-        if otherOnHide then otherOnHide(self, ...) end
-    end)
-
-    -- Guard against the quest-list side-panel toggle resetting the view;
-    -- some client builds don't have this side panel at all, hence the nil
+    -- Some client builds don't have this side panel at all, hence the nil
     -- checks all the way down.
     local sidePanelToggle = WorldMapFrame.SidePanelToggle
     if sidePanelToggle then
-        WrapSidePanelToggleButton(sidePanelToggle.OpenButton)
-        WrapSidePanelToggleButton(sidePanelToggle.CloseButton)
+        HookSidePanelToggleButton(sidePanelToggle.OpenButton)
+        HookSidePanelToggleButton(sidePanelToggle.CloseButton)
     end
-
-    -- Retry a restore that combat lockdown blocked.
-    local combatFrame = CreateFrame("Frame")
-    combatFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-    combatFrame:SetScript("OnEvent", function()
-        if pendingRestore and WorldMapFrame:IsShown() then
-            RestoreState()
-        end
-        pendingRestore = false
-    end)
 end

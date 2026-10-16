@@ -50,6 +50,7 @@ Renderer.lua
 CaveTable.lua
 Cave.lua
 CaveRenderer.lua
+Taint.lua
 MapMemory.lua
 ZoomLevels.lua
 ResetView.lua

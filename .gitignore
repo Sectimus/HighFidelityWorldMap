@@ -22,3 +22,6 @@ __pycache__/
 src/addon/client/Libs/
 .act.hfwm-app-private-key.pem
 .act.secrets
+
+# Local Kdenlive trailer project (video/audio assets, thumbnails)
+assets/projects/trailer/

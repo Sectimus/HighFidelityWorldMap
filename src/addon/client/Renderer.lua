@@ -1213,7 +1213,7 @@ local function DoRefresh(force)
         -- exploration provider populate on a given map (previously always
         -- pre-empted by RemoveAllData), its freshly (re)acquired chunk
         -- textures can still be mid-layout this same tick even though
-        -- EnumerateOverlayTextures() just forced them to exist. That shows
+        -- EnumerateOverlayTextures() just returned them. That shows
         -- up as real entries but zero usable geometry, not Fog of War's
         -- legitimate "nothing explored yet", so retry exactly once next
         -- frame rather than leaving the map blank until something else
@@ -1395,11 +1395,11 @@ local refreshing = false
 --- Main overlay refresh.
 ---
 --- Guards DoRefresh against being re-entered while it is already running.
---- Not theoretical: DoRefresh's Fog of War section calls
---- Exploration:EnumerateOverlayTextures, which calls
---- WorldMapFrame:RefreshAllDataProviders, which on this client can
+--- Not theoretical: DoRefresh's Fog of War section used to call
+--- WorldMapFrame:RefreshAllDataProviders (via
+--- Exploration:EnumerateOverlayTextures), which on this client can
 --- synchronously fire MAP_EXPLORATION_UPDATED, whose handler (Core.lua)
---- calls this same Refresh again before the outer call returns. Letting
+--- called this same Refresh again before the outer call returned. Letting
 --- that inner call proceed used to run Pool:ReleaseAll()/
 --- MaskPool:ReleaseAll() out from under the outer call's in-progress
 --- drawing, discarding some pieces and orphaning others: tiles went
