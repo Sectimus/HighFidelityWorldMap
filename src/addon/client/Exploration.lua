@@ -73,12 +73,23 @@ local function Revealing(mapID)
         and Config:GetClientZone(mapID) ~= nil
 end
 
+-- Reveal textures per pin. Our own, not the pin's overlayTexturePool:
+-- acquiring from Blizzard's pool in addon code taints it, and the pin's next
+-- refresh then runs tainted (ADDON_ACTION_BLOCKED in combat, issue #20).
+local revealTextures = {}  -- [pin] = { Texture, ... }
+
 --- After Blizzard's pin has drawn the explored overlays, draw the rest: the
 --- same loop as MapExplorationPinMixin:RefreshOverlays, over the baked list
 --- of every overlay, skipping the geometry the client already gave us.
---- Textures come from the pin's own overlayTexturePool, so the pin's next
---- RemoveAllData releases them like any of its own.
-local function RevealUnexplored(pin, fullUpdate)
+--- Hides them all when not revealing; safe to re-run any time.
+local function RevealUnexplored(pin)
+    local texs = revealTextures[pin]
+    if not texs then
+        texs = {}
+        revealTextures[pin] = texs
+    end
+    for _, tex in ipairs(texs) do tex:Hide() end
+
     local mapID = WorldMapFrame:GetMapID()
     local all = ZONE_OVERLAYS[mapID]
     if not all or not Revealing(mapID) then return end
@@ -92,6 +103,7 @@ local function RevealUnexplored(pin, fullUpdate)
         explored[t.offsetX .. "," .. t.offsetY .. "," .. t.textureWidth .. "," .. t.textureHeight] = true
     end
 
+    local n = 0
     for _, o in ipairs(all) do
         local offX, offY, w, h, cols, fdids = unpack(o)
         if not explored[offX .. "," .. offY .. "," .. w .. "," .. h] then
@@ -104,14 +116,18 @@ local function RevealUnexplored(pin, fullUpdate)
                     local pixW = k < cols and tileW or (w % tileW ~= 0 and w % tileW or tileW)
                     local fileW = 16
                     if k < cols then fileW = tileW else while fileW < pixW do fileW = fileW * 2 end end
-                    local tex = pin.overlayTexturePool:Acquire()
+                    n = n + 1
+                    local tex = texs[n]
+                    if not tex then
+                        tex = pin:CreateTexture(nil, "ARTWORK", nil, 0)
+                        texs[n] = tex
+                    end
                     tex:SetSize(pixW, pixH)
                     tex:SetTexCoord(0, pixW / fileW, 0, pixH / fileH)
+                    tex:ClearAllPoints()
                     tex:SetPoint("TOPLEFT", offX + tileW * (k - 1), -(offY + tileH * (j - 1)))
                     tex:SetTexture(fdids[(j - 1) * cols + k], nil, nil, "TRILINEAR")
-                    tex:SetDrawLayer("ARTWORK", 0)
                     tex:Show()
-                    if fullUpdate then pin.textureLoadGroup:AddTexture(tex) end
                 end
             end
         end
@@ -146,8 +162,16 @@ local function HookDPs()
     end
 end
 
+--- Re-sync the reveal with the current state. Blizzard's refreshes re-run
+--- it through the RefreshOverlays hook; this covers state changes (blend,
+--- Fog of War) between them, without forcing a Blizzard refresh.
+local function RevealAll()
+    for pin in pairs(hookedPins) do RevealUnexplored(pin) end
+end
+
 function Exploration:HidePins()
     HookDPs()
+    RevealAll()
 
     ForEachPin(function(pin)
         pin:SetAlpha(0)
@@ -168,14 +192,12 @@ function Exploration:HidePins()
     end
 end
 
---- Undo HidePins' alpha and mouse changes without touching the pins' data
---- (SetVisible(true) also refreshes every data provider, which recycles the
---- reveal textures Fog of War is reading geometry from, and can leave them
---- not laid out yet when the next draw reads them). For the HD/SD blend
---- with Fog of War on: Blizzard's own explored art has to show under the
---- overlay while those same textures stay enumerable.
+--- Undo HidePins' alpha and mouse changes. For the HD/SD blend with Fog of
+--- War on: Blizzard's own explored art has to show under the overlay while
+--- those same textures stay enumerable.
 function Exploration:ShowPins()
     HookDPs()
+    RevealAll()
 
     ForEachPin(function(pin)
         pin:SetAlpha(1)
@@ -231,80 +253,58 @@ function Exploration:ApplyLevels()
     end, true)
 end
 
+--- Show or hide Blizzard's exploration art. Pins are only hidden/shown,
+--- never rebuilt: RefreshAllDataProviders / RemoveAllData called from addon
+--- code run every provider tainted, and the pins, pools and map state they
+--- write then taint Blizzard's own later refreshes -- ADDON_ACTION_BLOCKED
+--- on SetPassThroughButtons in combat (issue #20), and the gamepad UI's
+--- focus/binding flows.
 ---@param visible boolean
 function Exploration:SetVisible(visible)
-    HookDPs()
-
-    if visible then
-        -- Includes inactive pins: RemoveAllData() released them while the
-        -- overlay was up, and the refresh below hands the same frames back.
-        ForEachPin(function(pin)
-            pin:SetAlpha(1)
-            RestoreMouse(pin)
-            pin:Show()
-            for _, region in ipairs({pin:GetRegions()}) do
-                -- Alpha only, never Show(): a hidden region is one its owner
-                -- cleared on purpose (Blizzard's released overlay textures,
-                -- MapUtils' ClearPin), holding last map's art and anchors.
-                -- Showing it paints that zone over the continent/world map.
-                region:SetAlpha(1)
-            end
-        end, true)
-        if WorldMapFrame.dataProviders then
-            for dp in next, WorldMapFrame.dataProviders do
-                if dp.overlayTexturePool then
-                    for tex in dp.overlayTexturePool:EnumerateActive() do
-                        tex:SetAlpha(1)
-                        tex:Show()
-                    end
-                end
-            end
-        end
-        if Config:IsGamepadUI() or InCombatLockdown() then
-            -- Gamepad UI: RefreshAllDataProviders / RemoveAllData called from
-            -- addon code run every provider tainted, and the pins, pools and
-            -- scroll state they write then taint Blizzard's gamepad focus and
-            -- binding flows. Pins are only hidden/shown here, never rebuilt.
-            -- Combat: the refresh reacquires pins, and AcquirePin calls the
-            -- combat-protected SetPassThroughButtons from our tainted stack
-            -- (ADDON_ACTION_BLOCKED).
-        elseif WorldMapFrame.RefreshAllDataProviders then
-            WorldMapFrame:RefreshAllDataProviders()
-        elseif WorldMapFrame.dataProviders then
-            for dp in next, WorldMapFrame.dataProviders do
-                if IsExplorationDP(dp) and dp.RefreshAllData then
-                    dp:RefreshAllData()
-                end
-            end
-        end
-
-        -- Second pass, in case a pool without EnumerateInactive handed back
-        -- a pin we could not reach above.  No-op once flags are cleared.
-        ForEachPin(RestoreMouse, true)
-    else
-        if WorldMapFrame.dataProviders and not Config:IsGamepadUI() then
-            for dp in next, WorldMapFrame.dataProviders do
-                if IsExplorationDP(dp) and dp.RemoveAllData then
-                    dp:RemoveAllData()
-                end
-            end
-        end
+    if not visible then
         self:HidePins()
+        return
+    end
+
+    HookDPs()
+    RevealAll()
+    -- Includes inactive pins: their alpha carries over when re-acquired.
+    ForEachPin(function(pin)
+        pin:SetAlpha(1)
+        RestoreMouse(pin)
+        pin:Show()
+        for _, region in ipairs({pin:GetRegions()}) do
+            -- Alpha only, never Show(): a hidden region is one its owner
+            -- cleared on purpose (Blizzard's released overlay textures,
+            -- MapUtils' ClearPin), holding last map's art and anchors.
+            -- Showing it paints that zone over the continent/world map.
+            region:SetAlpha(1)
+        end
+    end, true)
+    if WorldMapFrame.dataProviders then
+        for dp in next, WorldMapFrame.dataProviders do
+            if dp.overlayTexturePool then
+                for tex in dp.overlayTexturePool:EnumerateActive() do
+                    tex:SetAlpha(1)
+                    tex:Show()
+                end
+            end
+        end
     end
 end
 
 --- Every currently-active "explored" reveal texture Blizzard's own
 --- exploration data provider is drawing right now: hidden (see HidePins)
 --- but still real Texture objects with correct position, size, texture and
---- coordinates, kept and refreshed rather than released the way
---- SetVisible(false) releases them.
+--- coordinates.
 ---
 --- This is how Fog of War finds what to reveal (see Renderer's
 --- DrawExploredPiece): read the real geometry the client already computed,
 --- rather than recompute it from C_MapExplorationInfo, which would need
 --- assumptions (tile size, file padding, coordinate space) this addon has
---- no way to verify hold on every client. RefreshAllDataProviders runs
---- first, so this never reads data that predates the latest change.
+--- no way to verify hold on every client. Read as Blizzard last left it,
+--- never refreshed from here (see SetVisible): callers run after Blizzard's
+--- own refresh (map change/open hooks, MAP_EXPLORATION_UPDATED a frame on).
 ---
 --- Two client implementations are covered, since this addon has no way to
 --- know in advance which one it's talking to:
@@ -321,26 +321,11 @@ end
 ---     threw away every explored area but one; this collects all of them.
 ---@return table[] textures
 function Exploration:EnumerateOverlayTextures()
-    -- Closed map: nothing to reveal, and its data providers aren't ready
-    -- to refresh (Blizzard errors in the scroll container's zoom code when
-    -- one is forced before the map has ever been laid out, e.g. from
-    -- changing a setting in the options window). WorldMapFrame's OnShow
-    -- hook in Core.lua runs a full Refresh when it opens.
+    -- Closed map: nothing to reveal. WorldMapFrame's OnShow hook in Core.lua
+    -- runs a full Refresh when it opens.
     if not WorldMapFrame:IsShown() then return {} end
 
     HookDPs()
-
-    if Config:IsGamepadUI() or InCombatLockdown() then
-        -- see SetVisible: no refresh from addon code; reads what is there.
-    elseif WorldMapFrame.RefreshAllDataProviders then
-        WorldMapFrame:RefreshAllDataProviders()
-    elseif WorldMapFrame.dataProviders then
-        for dp in next, WorldMapFrame.dataProviders do
-            if IsExplorationDP(dp) and dp.RefreshAllData then
-                dp:RefreshAllData()
-            end
-        end
-    end
 
     local out = {}
     local dpPoolCount, dpPoolTotal = 0, 0

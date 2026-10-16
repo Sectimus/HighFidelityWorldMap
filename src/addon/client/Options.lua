@@ -236,8 +236,9 @@ local options = {
             type = "toggle",
             name = "Remember zoom+pan",
             desc = "Keeps the world map at the zoom and pan you left it "
-                .. "at, instead of resetting to your current zone on "
-                .. "reopen.",
+                .. "at when you reopen it on the same map. A different "
+                .. "map (you travelled, or were looking elsewhere) opens "
+                .. "on your current zone as usual.",
             get = function() return Config.db.rememberMapZoomPan end,
             set = function(_, value)
                 Config.db.rememberMapZoomPan = value

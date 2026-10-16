@@ -84,7 +84,3 @@ end
 function MaskPool:ActiveCount()
     return #activeMasks
 end
-
-function MaskPool:GetActive()
-    return activeMasks
-end

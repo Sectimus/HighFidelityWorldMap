@@ -109,6 +109,7 @@ local function OnUpdate(_, elapsed)
         local a = 1 - math.exp(-elapsed / TAU)
         nx, ny = curX + dx * a, curY + dy * a
     end
+    ns.Taint:Engage()  -- InstantPanAndZoom taints the scroll fields; see Taint.lua
     pcall(sc.InstantPanAndZoom, sc, scale, nx, ny, true)
     expX, expY = sc.currentScrollX, sc.currentScrollY
 

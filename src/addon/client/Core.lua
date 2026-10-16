@@ -28,8 +28,6 @@ local ResetView     = ns.ResetView
 local KeepCentered  = ns.KeepCentered
 local ToggleButton  = ns.ToggleButton
 local Coords       = ns.Coords
-local Pool           = ns.Pool
-local MaskPool       = ns.MaskPool
 local P              = ns.P
 
 -- Key Bindings entry for the cave window toggle (Bindings.xml); the same
@@ -167,67 +165,13 @@ function addon:OnEnable()
     P("Loaded. /hfwm to toggle, /hfwm options for settings.")
 end
 
-local preloaded = false
-
---- The first map open of a session is the only one that looks wrong: it
---- runs the client's first-open layout and streams tiles/masks while doing
---- so. Rehearse it once, near-invisibly and muted, shortly after login, by
---- toggling the map the way a keypress does -- then close it again the
---- moment every drawn texture reports loaded (Texture:IsObjectLoaded),
---- rather than after a fixed delay, so the map is unusable only as long as
---- the streaming actually needs (typically a fraction of a second). Once
---- per session.
+--- Warm the texture cache for the player's zone (Renderer:Preload), on
+--- login and every loading screen. Never by opening the map: a toggle from
+--- addon code makes the map's first open of the session run tainted, so its
+--- pin pools, mapID and panel layout stay tainted and the next open in combat
+--- blocks SetPassThroughButtons (ADDON_ACTION_BLOCKED, issue #20).
 function addon:PLAYER_ENTERING_WORLD()
-    if preloaded then return end
-    preloaded = true
-    -- Gamepad UI: skip. The rehearsal opens and closes the map from addon
-    -- code, so Blizzard's focus/binding stack runs tainted and later
-    -- blocks SetPreferredGamepadInteractTarget (ADDON_ACTION_FORBIDDEN).
-    if Config:IsGamepadUI() then return end
-    C_Timer.After(2, function()
-        if not (Config.db and Config.db.enabled)
-           or InCombatLockdown() or WorldMapFrame:IsShown() then
-            return
-        end
-        -- The client's OnShow/OnHide play a quest-log sound; SFX is off only
-        -- around the two toggles, restored in the same synchronous block.
-        local sfx = GetCVar("Sound_EnableSFX")
-        local function quietToggle()
-            SetCVar("Sound_EnableSFX", "0")
-            pcall(ToggleWorldMap)
-            SetCVar("Sound_EnableSFX", sfx)
-        end
-        WorldMapFrame:SetAlpha(0.01)
-        quietToggle()
-        local tries = 0
-        local ticker
-        ticker = C_Timer.NewTicker(0.05, function()
-            tries = tries + 1
-            local pending = false
-            -- Pool draws the tiles; MaskPool holds Fog of War's masks, the
-            -- ones that read opaque ("blocky") until loaded.
-            for _, list in ipairs({ Pool:GetActive(), MaskPool:GetActive() }) do
-                for _, tex in ipairs(list) do
-                    local ok, loaded = pcall(tex.IsObjectLoaded, tex)
-                    if ok and not loaded then pending = true break end
-                end
-                if pending then break end
-            end
-            -- 3s cap so a stuck or failed load can't hold the map hostage.
-            if not pending or tries > 60 then
-                ticker:Cancel()
-                if WorldMapFrame:IsShown() then quietToggle() end
-                WorldMapFrame:SetAlpha(1)
-                -- Remember-State saved this throwaway open's view on close;
-                -- don't let the player's first real open restore it.
-                MapMemory:Clear()
-                if Config.tracing then
-                    P(("preload: opened and closed in %.2fs"):format(
-                        tries * 0.05))
-                end
-            end
-        end)
-    end)
+    Renderer:Preload()
 end
 
 --- Fog of War's own reveal (Renderer's DrawExploredPiece) needs to hear
@@ -235,8 +179,12 @@ end
 --- while Fog of War is on and the map is shown; both checks avoid a full
 --- Refresh on every step the player takes.
 function addon:MAP_EXPLORATION_UPDATED()
-    if WorldMapFrame:IsShown() and (Config:FogOfWarEnabled()
-        or Config:WorldFogOfWarEnabled(WorldMapFrame:GetMapID())) then
-        Renderer:Refresh(true)
-    end
+    -- Next frame: Blizzard's own exploration provider handles this event
+    -- too, and Fog of War reads its pins rather than refreshing them.
+    C_Timer.After(0, function()
+        if WorldMapFrame:IsShown() and (Config:FogOfWarEnabled()
+            or Config:WorldFogOfWarEnabled(WorldMapFrame:GetMapID())) then
+            Renderer:Refresh(true)
+        end
+    end)
 end

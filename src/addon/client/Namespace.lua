@@ -24,6 +24,7 @@ ns.Options     = {}
 ns.Cave        = {}
 ns.CaveTable   = {}
 ns.CaveRenderer = {}
+ns.Taint       = {}
 ns.MapMemory   = {}
 ns.ZoomLevels  = {}
 ns.ResetView   = {}

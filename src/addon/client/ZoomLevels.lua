@@ -94,6 +94,8 @@ local function ExtendZoomLevels(sc)
     if Config:IsGamepadUI() then return end
     local lastLevel, ratio = LadderTail(sc)
     if not lastLevel then return end
+    -- Blizzard's zoom maths read these entries; see Taint.lua.
+    ns.Taint:Engage()
 
     local levels = sc.zoomLevels
     local scale = lastLevel.scale
@@ -115,6 +117,7 @@ end
 function ZoomLevels:Refresh()
     local sc = WorldMapFrame.ScrollContainer
     if not (sc and sc.CreateZoomLevels) or Config:IsGamepadUI() then return end
+    ns.Taint:Engage()
     pcall(sc.CreateZoomLevels, sc)
 
     local levels = sc.zoomLevels
