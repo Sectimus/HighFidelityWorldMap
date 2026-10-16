@@ -12,6 +12,7 @@
 -- /hfwm clarity     - higher-detail Kalimdor/Eastern Kingdoms/Azeroth maps
 --                     (off by default; may render slower)
 -- /hfwm debug       - print diagnostic info for current map
+-- /hfwm issue       - your settings as JSON, in a box to copy into bug reports
 -------------------------------------------------------------------------------
 local addonName, ns = ...
 local addon = ns.addon

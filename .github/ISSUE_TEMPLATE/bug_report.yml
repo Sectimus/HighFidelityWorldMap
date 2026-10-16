@@ -65,6 +65,15 @@ body:
       required: true
 
   - type: textarea
+    id: hfwm-settings
+    attributes:
+      label: HFWM settings
+      description: In game, run `/hfwm issue`, then copy the whole JSON from the box that opens and paste it here.
+      render: json
+    validations:
+      required: true
+
+  - type: textarea
     id: expected
     attributes:
       label: What did you expect?
