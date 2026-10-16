@@ -235,8 +235,23 @@ function MapLabels:Refresh()
     local labels = {}
     local all = canvas and Config.db.enabled
         and LABELS[WorldMapFrame:GetMapID() or 0]
+    -- Under Fog of War only explored areas are labelled; continent names always
+    -- show. A label's overlay is its area's explored-texture key (see emitter).
+    local mapID = WorldMapFrame:GetMapID() or 0
+    local fog = Config:FogOfWarEnabled() or Config:WorldFogOfWarEnabled(mapID)
+    local explored
+    if fog then
+        explored = {}
+        for _, t in ipairs(C_MapExplorationInfo.GetExploredMapTextures(mapID) or {}) do
+            explored[t.offsetX .. "," .. t.offsetY .. ","
+                .. t.textureWidth .. "," .. t.textureHeight] = true
+        end
+    end
     for _, label in ipairs(all or {}) do
-        if Config.db[KIND[label.kind].show] then labels[#labels + 1] = label end
+        if Config.db[KIND[label.kind].show]
+            and (not explored or label.overlay == nil or explored[label.overlay]) then
+            labels[#labels + 1] = label
+        end
     end
     if #labels == 0 then
         if frame then frame:Hide() end

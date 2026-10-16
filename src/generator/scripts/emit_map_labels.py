@@ -9,11 +9,14 @@ Four kinds, all from this build's own DB2 exports (see hfwm.config.endpoints):
 
 A town or capital is placed on the zone map its name resolves to through
 WorldMapOverlay (AreaTable name -> overlay art -> UiMap), at the POI's world
-position mapped through that map's UiMapAssignment Region_* bounds. The POI
-position matched the hand-placed towns to within ~0.02; a same-named subzone's
-overlay rect does not (Kharanos's rect is the whole subzone, not the town).
-A subzone is placed at the centre of its own overlay rect. Names that do not
-resolve are listed and skipped, not guessed.
+position mapped through that map's UiMapAssignment Region_* bounds. A subzone
+is placed at the centre of its own overlay rect. Names that do not resolve are
+listed and skipped, not guessed.
+
+Each labelled area also gets an ``overlay`` key: its WorldMapOverlay row's
+OffsetX,OffsetY,TextureWidth,TextureHeight. C_MapExplorationInfo reports an
+explored texture with those same four numbers, so MapLabels can tell whether
+that exact area is explored under Fog of War.
 """
 
 import sys
@@ -93,6 +96,12 @@ def _rect_centre(row):
     return (l + r) / 2, (t + b) / 2
 
 
+def _overlay_key(row):
+    """The explored-texture key of a WorldMapOverlay row, as Lua writes it."""
+    return ",".join(str(_i(row, c)) for c in
+                    ("OffsetX", "OffsetY", "TextureWidth", "TextureHeight"))
+
+
 def main():
     uimap = {_i(r, "ID"): r for r in fetch_pinned_table("UiMap")}
     assignments = fetch_pinned_table("UiMapAssignment")
@@ -128,28 +137,34 @@ def main():
             "name": row["Name_lang"], "kind": "continent", "u": 0.5, "v": 0.5,
         })
 
-    # ---- which zone map each area is drawn on ----------------------------
+    # ---- which zone map each area is drawn on, and its overlay row --------
     # Every overlay row links its areas to an art, clickable or not, so a
     # capital whose rect is zero-size still resolves to its zone.
     art_for_area = {}   # areaID -> [uiMapID]
-    subzone_rect = {}   # (uiMapID, areaID) -> (size, u, v), for subzones
+    overlay_key = {}    # (uiMapID, areaID) -> (rect size, overlay key)
+    subzone_rect = {}   # (uiMapID, areaID) -> (rect size, u, v)
     for r in overlays:
         uid = art_to_map.get(_i(r, "UiMapArtID"))
         if uid is None or not is_zone(uid):
             continue
+        key = _overlay_key(r)
+        centre = _rect_centre(r)
+        size = 0.0
+        if centre is not None:
+            size = abs(_f(r, "HitRectRight") - _f(r, "HitRectLeft")) * \
+                abs(_f(r, "HitRectBottom") - _f(r, "HitRectTop"))
         for k in range(4):
             aid = _i(r, f"AreaID_{k}")
-            if aid:
-                art_for_area.setdefault(aid, []).append(uid)
-        centre = _rect_centre(r)
-        aid = _i(r, "AreaID_0")
-        if centre is None or not aid:
-            continue
-        size = abs(_f(r, "HitRectRight") - _f(r, "HitRectLeft")) * \
-            abs(_f(r, "HitRectBottom") - _f(r, "HitRectTop"))
-        key = (uid, aid)
-        if key not in subzone_rect or size > subzone_rect[key][0]:
-            subzone_rect[key] = (size, centre[0] / ART_W, centre[1] / ART_H)
+            if not aid:
+                continue
+            art_for_area.setdefault(aid, []).append(uid)
+            if (uid, aid) not in overlay_key or size > overlay_key[(uid, aid)][0]:
+                overlay_key[(uid, aid)] = (size, key)
+            if centre is None or k != 0:
+                continue
+            u, v = centre[0] / ART_W, centre[1] / ART_H
+            if (uid, aid) not in subzone_rect or size > subzone_rect[(uid, aid)][0]:
+                subzone_rect[(uid, aid)] = (size, u, v)
 
     # ---- towns and capitals ----------------------------------------------
     unresolved = []
@@ -168,14 +183,15 @@ def main():
             unresolved.append(name)
             continue
 
-        cands = []
+        cands = []  # (uiMapID, areaID)
         for a in names_to_area.get(ALIASES.get(name, name), []):
-            for uid in art_for_area.get(_i(a, "ID"), []):
-                if uid not in cands:
-                    cands.append(uid)
+            aid = _i(a, "ID")
+            for uid in art_for_area.get(aid, []):
+                if (uid, aid) not in cands:
+                    cands.append((uid, aid))
 
         done = False
-        for uid in cands:
+        for uid, aid in cands:
             asg = next((a for a in by_map.get(uid, [])
                         if _i(a, "MapID") == cont
                         and _contains(_region(a), X, Y)), None)
@@ -184,15 +200,17 @@ def main():
             if (uid, name) not in placed:
                 placed.add((uid, name))
                 u, v = _uv(_region(asg), X, Y)
-                out.setdefault(uid, []).append({
-                    "name": name, "kind": kind, "u": u, "v": v,
-                })
+                entry = {"name": name, "kind": kind, "u": u, "v": v}
+                if (uid, aid) in overlay_key:
+                    entry["overlay"] = overlay_key[(uid, aid)][1]
+                out.setdefault(uid, []).append(entry)
             done = True
             break
         if not done:
             unresolved.append(name)
 
     # ---- subzones -----------------------------------------------------------
+    areas_by_id = {_i(r, "ID"): r for r in areatable}
     for (uid, aid), (_, u, v) in sorted(subzone_rect.items()):
         at = areas_by_id.get(aid)
         if not at or _i(at, "ParentAreaID") in (0, None):
@@ -203,6 +221,7 @@ def main():
         placed.add((uid, name))
         out.setdefault(uid, []).append({
             "name": name, "kind": "subzone", "u": u, "v": v,
+            "overlay": overlay_key[(uid, aid)][1],
         })
 
     _write(out)
@@ -221,16 +240,20 @@ def _write(out):
         f.write("-- Auto-generated by scripts/emit_map_labels.py - DO NOT EDIT\n")
         f.write(f"-- World-map labels on build {GAME_BUILD}, keyed by UiMapID.\n")
         f.write("-- u/v: centre, 0..1 from the map's top-left. h: canvas units\n")
-        f.write("-- at label scale 1. Read by MapLabels.lua.\n")
+        f.write("-- at label scale 1. overlay: the area's explored-texture key,\n")
+        f.write("-- for Fog of War. Read by MapLabels.lua.\n")
         f.write("HFWMF_MAP_LABELS = {\n")
         for uid in sorted(out):
             f.write(f"    [{uid}] = {{\n")
             for d in sorted(out[uid], key=lambda d: (KIND_ORDER[d["kind"]], d["name"])):
-                f.write(
+                line = (
                     f"        {{ name = {lua_string(d['name'])}, "
                     f"kind = \"{d['kind']}\", h = {LABEL_H[d['kind']]}, "
-                    f"u = {d['u']:.3f}, v = {d['v']:.3f} }},\n"
+                    f"u = {d['u']:.3f}, v = {d['v']:.3f}"
                 )
+                if d.get("overlay"):
+                    line += f", overlay = {lua_string(d['overlay'])}"
+                f.write(line + " },\n")
             f.write("    },\n")
         f.write("}\n")
 

@@ -189,5 +189,6 @@ function addon:MAP_EXPLORATION_UPDATED()
             or Config:WorldFogOfWarEnabled(WorldMapFrame:GetMapID())) then
             Renderer:Refresh(true)
         end
+        MapLabels:Refresh()
     end)
 end
