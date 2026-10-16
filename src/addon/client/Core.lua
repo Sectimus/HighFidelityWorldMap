@@ -28,6 +28,7 @@ local ResetView     = ns.ResetView
 local KeepCentered  = ns.KeepCentered
 local ToggleButton  = ns.ToggleButton
 local Coords       = ns.Coords
+local MapLabels    = ns.MapLabels
 local P              = ns.P
 
 -- Key Bindings entry for the cave window toggle (Bindings.xml); the same
@@ -65,6 +66,7 @@ function addon:OnEnable()
         Config.lastMapID = nil
         Renderer:Refresh(true)
         Cave:UpdateState()
+        MapLabels:Refresh()
     end)
 
     if MapCanvasDetailLayerMixin
@@ -81,6 +83,7 @@ function addon:OnEnable()
         Config.lastMapID = nil
         Renderer:Refresh(true)
         Cave:UpdateState()
+        MapLabels:Refresh()
     end)
     WorldMapFrame:HookScript("OnHide", function()
         CaveRenderer:SetMapOpen(false)

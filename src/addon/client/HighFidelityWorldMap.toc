@@ -58,6 +58,7 @@ KeepCentered.lua
 Integrations.lua
 ToggleButton.lua
 Coords.lua
+MapLabels.lua
 Commands.lua
 Options.lua
 Core.lua

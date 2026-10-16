@@ -129,6 +129,10 @@ Config.DEFAULTS = {
     -- client draws them; off hides that readout.
     showPlayerCoords = true,
     showMouseCoords  = true,
+
+    -- "Extra Labels" (MapLabels.lua): names drawn on the map over its art.
+    -- Location Names: towns and places such as Ironforge.
+    showLocationNames = true,
 }
 -- The db also carries `caveWindowPoint` -- { left, top }, the window's
 -- TOPLEFT in UIParent units -- written by CaveRenderer when the window is
@@ -802,6 +806,7 @@ function Config:RefreshProfile()
     ns.ZoomLevels:Refresh()
     ns.Cave:UpdateState()
     ns.Options:Refresh()
+    ns.MapLabels:Refresh()
 end
 
 --- Create the AceDB-3.0 database after ADDON_LOADED (see Core.lua's

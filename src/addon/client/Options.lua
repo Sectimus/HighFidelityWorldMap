@@ -229,6 +229,7 @@ local options = {
                 ns.Renderer:ForceRefresh()
                 ns.ToggleButton:Refresh()
                 ns.Coords:Refresh()
+                ns.MapLabels:Refresh()
             end,
         },
         rememberMapZoomPan = {
@@ -309,6 +310,26 @@ local options = {
                 Config.db.showMouseCoords = value
                 ns.Coords:Refresh()
             end,
+        },
+        extraLabels = {
+            order = 59,
+            type = "group",
+            inline = true,
+            name = "Extra Labels",
+            args = {
+                showLocationNames = {
+                    order = 10,
+                    type = "toggle",
+                    name = "Location Names",
+                    desc = "Shows the names of towns and other places on "
+                        .. "the world map, such as Ironforge.",
+                    get = function() return Config.db.showLocationNames end,
+                    set = function(_, value)
+                        Config.db.showLocationNames = value
+                        ns.MapLabels:Refresh()
+                    end,
+                },
+            },
         },
 
         toggleButtonEnabled = {
