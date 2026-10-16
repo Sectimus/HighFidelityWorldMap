@@ -52,10 +52,55 @@ local function NoLabelsOn()
         or Config.db.showTownsHubs)
 end
 
+local SECTION_RESET = "HFWM-SectionReset"  -- registered below, with the widgets
+-- The Config.db fields of each label kind: the show toggle, scale, Auto-scale
+-- and the prefix of its <color>ColorMode / Color / Color2 / GradientDir /
+-- Outline fields.
+local LABEL_KINDS = {
+    continent = { show = "showContinentNames", scale = "continentLabelScale",
+                  auto = "continentAutoScale", color = "continentLabel" },
+    capital   = { show = "showCapitalCities", scale = "capitalLabelScale",
+                  auto = "capitalAutoScale", color = "capitalLabel" },
+    town      = { show = "showTownsHubs", scale = "townLabelScale",
+                  auto = "townAutoScale", color = "townLabel" },
+}
+
+--- Every Config.db field of one label kind, for Reset to defaults.
+local function LabelKeys(k)
+    local keys = { k.show, k.scale, k.auto }
+    for _, suffix in ipairs({ "ColorMode", "Color", "Color2", "GradientDir", "Outline" }) do
+        keys[#keys + 1] = k.color .. suffix
+    end
+    return keys
+end
+
+-- What the Labels page's Reset to Defaults restores.
+local LABEL_PAGE_KEYS = { "labelScale", "labelShowOnSD" }
+for _, k in pairs(LABEL_KINDS) do
+    for _, key in ipairs(LabelKeys(k)) do LABEL_PAGE_KEYS[#LABEL_PAGE_KEYS + 1] = key end
+end
+
+--- Is any of *keys* in Config.db different from its default? Colours are
+--- {r, g, b} tables, so those compare element by element.
+local function DiffersFromDefaults(keys)
+    for _, key in ipairs(keys) do
+        local v, d = Config.db[key], Config.DEFAULTS[key]
+        if type(d) == "table" then
+            for i = 1, #d do
+                if v[i] ~= d[i] then return true end
+            end
+        elseif v ~= d then
+            return true
+        end
+    end
+    return false
+end
+
 --- A Labels section, boxed like Map Background: an Enabled toggle for one
---- label kind, its own Auto-scale, and its own Label scale. showKey, scaleKey
---- and autoKey are Config.db fields.
-local function LabelSection(order, title, showKey, scaleKey, autoKey, desc)
+--- label kind (*k*, from LABEL_KINDS), its own Auto-scale, Label scale,
+--- colours and a Reset to defaults.
+local function LabelSection(order, title, k, desc)
+    local showKey, scaleKey, autoKey, colorKey = k.show, k.scale, k.auto, k.color
     return {
         order = order,
         type = "group",
@@ -99,6 +144,97 @@ local function LabelSection(order, title, showKey, scaleKey, autoKey, desc)
                 set = function(_, value)
                     Config.db[scaleKey] = value
                     ns.MapLabels:Refresh()
+                end,
+            },
+            colorMode = {
+                order = 30,
+                type = "select",
+                name = "Colour",
+                values = { solid = "Solid", gradient = "Gradient" },
+                sorting = { "solid", "gradient" },
+                disabled = function() return not Config.db[showKey] end,
+                get = function() return Config.db[colorKey .. "ColorMode"] end,
+                set = function(_, value)
+                    Config.db[colorKey .. "ColorMode"] = value
+                    ns.MapLabels:Refresh()
+                end,
+            },
+            color = {
+                order = 31,
+                width = 0.5,
+                type = "color",
+                name = function()
+                    return Config.db[colorKey .. "ColorMode"] == "gradient"
+                        and "Colour 1" or "Colour"
+                end,
+                disabled = function() return not Config.db[showKey] end,
+                get = function() return unpack(Config.db[colorKey .. "Color"]) end,
+                set = function(_, r, g, b)
+                    Config.db[colorKey .. "Color"] = { r, g, b }
+                    ns.MapLabels:Refresh()
+                end,
+            },
+            color2 = {
+                order = 32,
+                width = 0.5,
+                type = "color",
+                name = "Colour 2",
+                hidden = function()
+                    return Config.db[colorKey .. "ColorMode"] ~= "gradient"
+                end,
+                disabled = function() return not Config.db[showKey] end,
+                get = function() return unpack(Config.db[colorKey .. "Color2"]) end,
+                set = function(_, r, g, b)
+                    Config.db[colorKey .. "Color2"] = { r, g, b }
+                    ns.MapLabels:Refresh()
+                end,
+            },
+            outline = {
+                order = 33,
+                width = 0.75,
+                type = "color",
+                name = "Outline colour",
+                desc = "Colour of the outline around these labels.",
+                disabled = function() return not Config.db[showKey] end,
+                get = function() return unpack(Config.db[colorKey .. "Outline"]) end,
+                set = function(_, r, g, b)
+                    Config.db[colorKey .. "Outline"] = { r, g, b }
+                    ns.MapLabels:Refresh()
+                end,
+            },
+            gradientDir = {
+                order = 34,
+                type = "select",
+                name = "Gradient direction",
+                values = { HORIZONTAL = "Left to right",
+                           VERTICAL = "Top to bottom" },
+                sorting = { "HORIZONTAL", "VERTICAL" },
+                hidden = function()
+                    return Config.db[colorKey .. "ColorMode"] ~= "gradient"
+                end,
+                disabled = function() return not Config.db[showKey] end,
+                get = function() return Config.db[colorKey .. "GradientDir"] end,
+                set = function(_, value)
+                    Config.db[colorKey .. "GradientDir"] = value
+                    ns.MapLabels:Refresh()
+                end,
+            },
+            reset = {
+                order = 1,
+                hidden = function() return not DiffersFromDefaults(LabelKeys(k)) end,
+                type = "execute",
+                dialogControl = SECTION_RESET,
+                name = "Reset to defaults",
+                confirm = true,
+                confirmText = "Reset the " .. title .. " label settings to "
+                    .. "their defaults?",
+                func = function()
+                    for _, key in ipairs(LabelKeys(k)) do
+                        Config.db[key] = Config.DEFAULTS[key]
+                    end
+                    ns.MapLabels:Refresh()
+                    GameTooltip:Hide()  -- the button is about to vanish; no OnLeave
+                    ns.Options:Refresh()
                 end,
             },
         },
@@ -241,6 +377,60 @@ do
             self.frame:Enable()
         end
         return checkbox
+    end, 1)
+end
+
+--- "Reset to defaults" button for a Labels section, pinned to the top-right
+--- of its box. AceConfigDialog flows every widget into the group's content,
+--- so this one takes a 1x1 slot there (the widget's frame is that empty
+--- holder) and the real button is anchored to the group's own frame instead.
+do
+    local AceGUI = LibStub("AceGUI-3.0")
+    AceGUI:RegisterWidgetType(SECTION_RESET, function()
+        local widget = AceGUI.WidgetRegistry.Button()
+        widget.type = SECTION_RESET  -- own pool, not Button's
+        local button = widget.frame
+        local holder = CreateFrame("Frame", nil, UIParent)
+        holder:Hide()
+        holder:SetSize(1, 1)
+        holder.obj = widget
+        widget.frame = holder
+        button:SetParent(holder)
+        button:SetSize(22, 22)
+        button:Show()  -- the stock Button constructor hides it; the holder now gates visibility
+        widget.text:Hide()
+        local icon = button:CreateTexture(nil, "ARTWORK")
+        icon:SetTexture("Interface\\Buttons\\UI-RefreshButton")
+        icon:SetSize(16, 16)
+        icon:SetPoint("CENTER")
+        -- The option's name is the tooltip, not button text.
+        -- SetScript, not HookScript: the stock OnEnter fires the widget's
+        -- OnEnter, which makes AceConfigDialog show a second tooltip.
+        button:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT")
+            GameTooltip:SetText(widget.tip or "", 1, 1, 1)
+        end)
+        button:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+        local setParent, onAcquire = widget.SetParent, widget.OnAcquire
+        function widget:OnAcquire()
+            onAcquire(self)
+            holder:SetSize(1, 1)
+        end
+        function widget:SetParent(parent)
+            setParent(self, parent)
+            button:ClearAllPoints()
+            button:SetPoint("TOPRIGHT", parent.frame, "TOPRIGHT", -4, 0)
+        end
+        function widget:SetText(text) self.tip = text end
+        function widget:SetDisabled(disabled)
+            self.disabled = disabled
+            button:SetEnabled(not disabled)
+            icon:SetDesaturated(disabled)
+        end
+        function widget:SetWidth() end
+        function widget:SetHeight() end
+        return widget
     end, 1)
 end
 -- Same StaticPopup pattern as HFWM_ART_URL above: confirmation before a
@@ -448,9 +638,11 @@ local options = {
                         .. "Label scale.",
                     min = 0.5, max = 2, step = 0.05, isPercent = true,
                     disabled = NoLabelsOn,
-                    get = function() return Config.db.labelScale end,
+                    -- Stored as a multiple of the base size; shown halved so
+                    -- the default (2) reads as 100%.
+                    get = function() return Config.db.labelScale / 2 end,
                     set = function(_, value)
-                        Config.db.labelScale = value
+                        Config.db.labelScale = value * 2
                         ns.MapLabels:Refresh()
                     end,
                 },
@@ -469,18 +661,15 @@ local options = {
                     end,
                 },
                 continentLabels = LabelSection(20, "Continents",
-                    "showContinentNames", "continentLabelScale",
-                    "continentAutoScale",
+                    LABEL_KINDS.continent,
                     "Shows the names of continents, such as Eastern "
                         .. "Kingdoms, on their continent maps."),
                 capitalLabels = LabelSection(21, "Capital Cities",
-                    "showCapitalCities", "capitalLabelScale",
-                    "capitalAutoScale",
+                    LABEL_KINDS.capital,
                     "Shows the names of capital cities, such as "
                         .. "Stormwind and Ironforge."),
                 townLabels = LabelSection(22, "Towns/Hubs",
-                    "showTownsHubs", "townLabelScale",
-                    "townAutoScale",
+                    LABEL_KINDS.town,
                     "Shows the names of towns and hubs, such as "
                         .. "Goldshire and Northshire."),
             },
@@ -813,10 +1002,7 @@ local MAIN_PAGE = {
 }
 local SUB_PAGES = {
     { key = "labels", title = "Labels",
-      keys = { "labelScale", "labelShowOnSD",
-               "showContinentNames", "showCapitalCities", "showTownsHubs",
-               "continentLabelScale", "capitalLabelScale", "townLabelScale",
-               "continentAutoScale", "capitalAutoScale", "townAutoScale" } },
+      keys = LABEL_PAGE_KEYS },
     { key = "cave", title = "Cave Map",
       keys = { "caveEnabled", "caveAutoOpen", "caveRememberState",
                "caveKeepOpen", "cavePlacement", "caveOtherIndoors",

@@ -6,10 +6,11 @@
 -- showCapitalCities, showTownsHubs). Only the entries hand-written in LABELS
 -- below; issue #17 will replace that with generated data.
 --
--- Each label is one texture from Assets/, with the gold text and brown
--- outline already baked in. Labels sit on one mouse-disabled frame on the map
--- canvas, above Config.overlayFrame (whose alpha changes with the SD/Hybrid/HD
--- background). They scale with the canvas, like the art under them.
+-- Each label is text drawn at runtime in Friz Quadrata TT, the game's own UI
+-- font: a brown outline behind a gold fill. Labels sit on one mouse-disabled
+-- frame on the map canvas, above Config.overlayFrame (whose alpha changes with
+-- the SD/Hybrid/HD background). They scale with the canvas, like the art under
+-- them.
 -------------------------------------------------------------------------------
 local addonName, ns = ...
 local Config    = ns.Config
@@ -17,107 +18,106 @@ local MapLabels = ns.MapLabels
 
 local WorldMapFrame = _G.WorldMapFrame
 
--- [uiMapID] = { { texture, kind, w, h, u, v }, ... }. texture is the Assets/
--- file name without ".tga"; kind is "continent", "capital" or "town", and
--- picks its Options toggle through SHOW below; w and h its size in canvas
--- units; u/v the centre in 0-1 map coordinates from the top-left. Placed by
--- hand: each point is the centroid of the area's ADT chunks, on the outdoor
--- zone map that contains it.
+-- [uiMapID] = { { name, kind, h, u, v }, ... }. name is the text shown; kind is
+-- "continent", "capital" or "town", and picks its Options toggle through KIND
+-- below; h its height in canvas units at label scale 1; u/v the centre in 0-1
+-- map coordinates from the top-left. Placed by hand: each point is the
+-- centroid of the area's ADT chunks, on the outdoor zone map that contains it.
 local LABELS = {
     -- Continent names, on the continent maps.
     [1414] = {
-        { texture = "KalimdorLabel", kind = "continent",
-          w = 104, h = 21, u = 0.493, v = 0.536 },
+        { name = "Kalimdor", kind = "continent",
+          h = 21, u = 0.493, v = 0.536 },
     },
     [1415] = {
-        { texture = "EasternKingdomsLabel", kind = "continent",
-          w = 202.5, h = 26.5, u = 0.490, v = 0.510 },
+        { name = "Eastern Kingdoms", kind = "continent",
+          h = 26.5, u = 0.490, v = 0.510 },
     },
     [1411] = {
-        { texture = "RazorHillLabel", kind = "town",
-          w = 56, h = 12, u = 0.532, v = 0.421 },
+        { name = "Razor Hill", kind = "town",
+          h = 12, u = 0.532, v = 0.421 },
     },
     [1412] = {
-        { texture = "ThunderBluffLabel", kind = "capital",
-          w = 107.5, h = 15.5, u = 0.398, v = 0.353 },
+        { name = "Thunder Bluff", kind = "capital",
+          h = 15.5, u = 0.398, v = 0.353 },
     },
     [1413] = {
-        { texture = "TheCrossroadsLabel", kind = "town",
-          w = 87, h = 12, u = 0.519, v = 0.300 },
-        { texture = "RatchetLabel", kind = "town",
-          w = 47, h = 12, u = 0.620, v = 0.380 },
+        { name = "The Crossroads", kind = "town",
+          h = 12, u = 0.519, v = 0.300 },
+        { name = "Ratchet", kind = "town",
+          h = 12, u = 0.620, v = 0.380 },
     },
     [1417] = {
-        { texture = "RefugePointeLabel", kind = "town",
-          w = 81, h = 14.5, u = 0.460, v = 0.473 },
+        { name = "Refuge Pointe", kind = "town",
+          h = 14.5, u = 0.460, v = 0.473 },
     },
     [1420] = {
-        { texture = "UndercityLabel", kind = "capital",
-          w = 77.5, h = 19, u = 0.619, v = 0.726 },
-        { texture = "BrillLabel", kind = "town",
-          w = 26, h = 12, u = 0.593, v = 0.502 },
+        { name = "Undercity", kind = "capital",
+          h = 19, u = 0.619, v = 0.726 },
+        { name = "Brill", kind = "town",
+          h = 12, u = 0.593, v = 0.502 },
     },
     -- Ironforge on the Dun Morogh map, from its world position (-4981, -881)
     -- and the map's UiMapAssignment bounds.
     [1426] = {
-        { texture = "IronforgeLabel", kind = "capital",
-          w = 73.25, h = 19.5, u = 0.545, v = 0.336 },
-        { texture = "KharanosLabel", kind = "town",
-          w = 56, h = 12, u = 0.468, v = 0.518 },
+        { name = "Ironforge", kind = "capital",
+          h = 19.5, u = 0.545, v = 0.336 },
+        { name = "Kharanos", kind = "town",
+          h = 12, u = 0.468, v = 0.518 },
     },
     [1429] = {
-        { texture = "StormwindLabel", kind = "capital",
-          w = 86, h = 15.5, u = 0.232, v = 0.308 },
-        { texture = "GoldshireLabel", kind = "town",
-          w = 56.5, h = 12, u = 0.429, v = 0.655 },
-        { texture = "NorthshireLabel", kind = "town",
-          w = 64, h = 12, u = 0.525, v = 0.393 },
+        { name = "Stormwind", kind = "capital",
+          h = 15.5, u = 0.232, v = 0.308 },
+        { name = "Goldshire", kind = "town",
+          h = 12, u = 0.429, v = 0.655 },
+        { name = "Northshire", kind = "town",
+          h = 12, u = 0.525, v = 0.393 },
     },
     [1432] = {
-        { texture = "ThelsamarLabel", kind = "town",
-          w = 62, h = 12, u = 0.368, v = 0.495 },
+        { name = "Thelsamar", kind = "town",
+          h = 12, u = 0.368, v = 0.495 },
     },
     [1433] = {
-        { texture = "LakeshireLabel", kind = "town",
-          w = 57.5, h = 12, u = 0.230, v = 0.446 },
+        { name = "Lakeshire", kind = "town",
+          h = 12, u = 0.230, v = 0.446 },
     },
     [1434] = {
-        { texture = "BootyBayLabel", kind = "town",
-          w = 59.5, h = 14, u = 0.269, v = 0.752 },
+        { name = "Booty Bay", kind = "town",
+          h = 14, u = 0.269, v = 0.752 },
     },
     [1436] = {
-        { texture = "SentinelHillLabel", kind = "town",
-          w = 70, h = 12, u = 0.550, v = 0.507 },
+        { name = "Sentinel Hill", kind = "town",
+          h = 12, u = 0.550, v = 0.507 },
     },
     [1437] = {
-        { texture = "MenethilHarborLabel", kind = "town",
-          w = 95, h = 12, u = 0.098, v = 0.569 },
+        { name = "Menethil Harbor", kind = "town",
+          h = 12, u = 0.098, v = 0.569 },
     },
     [1438] = {
-        { texture = "DarnassusLabel", kind = "capital",
-          w = 81.5, h = 15, u = 0.293, v = 0.555 },
+        { name = "Darnassus", kind = "capital",
+          h = 15, u = 0.293, v = 0.555 },
     },
     [1439] = {
-        { texture = "AuberdineLabel", kind = "town",
-          w = 61, h = 12, u = 0.374, v = 0.430 },
+        { name = "Auberdine", kind = "town",
+          h = 12, u = 0.374, v = 0.430 },
     },
     [1440] = {
-        { texture = "AstranaarLabel", kind = "town",
-          w = 58.5, h = 11.5, u = 0.368, v = 0.508 },
+        { name = "Astranaar", kind = "town",
+          h = 11.5, u = 0.368, v = 0.508 },
     },
     [1446] = {
-        { texture = "GadgetzanLabel", kind = "town",
-          w = 63, h = 14.5, u = 0.524, v = 0.269 },
+        { name = "Gadgetzan", kind = "town",
+          h = 14.5, u = 0.524, v = 0.269 },
     },
     [1452] = {
-        { texture = "EverlookLabel", kind = "town",
-          w = 52, h = 12, u = 0.613, v = 0.371 },
+        { name = "Everlook", kind = "town",
+          h = 12, u = 0.613, v = 0.371 },
     },
     -- Orgrimmar's area centroid lies outside Durotar's bounds, so it sits on
     -- its own zone map.
     [1454] = {
-        { texture = "OrgrimmarLabel", kind = "capital",
-          w = 88.5, h = 19, u = 0.535, v = 0.466 },
+        { name = "Orgrimmar", kind = "capital",
+          h = 19, u = 0.535, v = 0.466 },
     },
 }
 
@@ -125,24 +125,145 @@ local LABELS = {
 --- Auto-scale fields.
 local KIND = {
     continent = { show = "showContinentNames", scale = "continentLabelScale",
-                  auto = "continentAutoScale" },
+                  auto = "continentAutoScale", color = "continentLabel" },
     capital   = { show = "showCapitalCities", scale = "capitalLabelScale",
-                  auto = "capitalAutoScale" },
+                  auto = "capitalAutoScale", color = "capitalLabel" },
     town      = { show = "showTownsHubs", scale = "townLabelScale",
-                  auto = "townAutoScale" },
+                  auto = "townAutoScale", color = "townLabel" },
+}
+
+local FONT = "Fonts\\FRIZQT__.TTF"
+-- Font height per unit of label h. Matches the text size of the art the
+-- labels were drawn at before; approximate, tune in game.
+local FONT_PER_H = 0.85
+-- Vertical gradients stack flat-colour clipped copies of the text, one per
+-- band, sized so neighbouring bands differ by about BAND_LEVELS of 255.
+-- Each band costs 2 FontStrings per label.
+-- ponytail: steps of ~2 levels, capped at MAX_BANDS=40; a gradient spanning
+-- more than 80 levels will show steps. Raise MAX_BANDS to fix.
+local BAND_LEVELS = 2
+local MAX_BANDS = 40
+local OUTLINE_OFFSETS = {
+    { -1, -1 }, { -1, 0 }, { -1, 1 }, { 0, -1 },
+    { 0, 1 }, { 1, -1 }, { 1, 0 }, { 1, 1 },
 }
 
 local frame
-local labelTextures = {}
+local labelFrames = {}  -- [i] = { holder, outline = {FontString}, bands = {{clip, fs}} }
 
---- Show label *label* centred on (x, y) from the canvas's top-left.
-local function Layout(tex, label, x, y, scale)
-    tex:SetTexture("Interface\\AddOns\\" .. addonName .. "\\Assets\\"
-        .. label.texture .. ".tga")
-    tex:SetSize(label.w * scale, label.h * scale)
-    tex:ClearAllPoints()
-    tex:SetPoint("CENTER", frame, "TOPLEFT", x, y)
-    tex:Show()
+local function Text(parent, layer)
+    local fs = parent:CreateFontString(nil, layer)
+    fs:SetJustifyH("LEFT")
+    return fs
+end
+
+--- One label: a holder frame with the brown copies behind and the gold text
+--- in front. Positioned and painted by Paint.
+local function NewLabel()
+    local holder = CreateFrame("Frame", nil, frame)
+    holder:EnableMouse(false)
+    local l = { holder = holder, outline = {}, bands = {} }
+    for i = 1, #OUTLINE_OFFSETS do
+        l.outline[i] = Text(holder, "BACKGROUND")
+    end
+    return l
+end
+
+--- Two hex digits of a 0..1 colour channel.
+local function Hex(v)
+    return ("%02x"):format(math.floor(v * 255 + 0.5))
+end
+
+--- *name* with each letter in its own colour, from a at the first letter to b
+--- at the last. Inline colour codes, so the gradient needs no art.
+local function Inline(name, a, b)
+    local out, n = {}, #name
+    for i = 1, n do
+        local t = n > 1 and (i - 1) / (n - 1) or 0
+        out[i] = "|cff" .. Hex(a[1] + (b[1] - a[1]) * t)
+            .. Hex(a[2] + (b[2] - a[2]) * t) .. Hex(a[3] + (b[3] - a[3]) * t)
+            .. name:sub(i, i) .. "|r"
+    end
+    return table.concat(out)
+end
+
+--- Position and colour one label centred on (x, y) from the canvas's
+--- top-left, at *scale*. The outline is the Outline colour. The fill is the
+--- Color of its kind, solid or gradient. A horizontal gradient is set in the
+--- text itself; a vertical one is BANDS clipped copies, each in its band's
+--- colour from the top (Color) to the bottom (Color2).
+local function Paint(l, label, x, y, scale)
+    local key = KIND[label.kind].color
+    local size = label.h * FONT_PER_H * scale
+    local a = Config.db[key .. "Color"]
+    local b = a
+    local dir = "HORIZONTAL"
+    local gradient = Config.db[key .. "ColorMode"] == "gradient"
+    if gradient then
+        b = Config.db[key .. "Color2"]
+        dir = Config.db[key .. "GradientDir"]
+    end
+    local vertical = gradient and dir == "VERTICAL"
+    local o = Config.db[key .. "Outline"]
+
+    for i, fs in ipairs(l.outline) do
+        fs:SetFont(FONT, size, "")
+        fs:SetText(label.name)
+        fs:SetTextColor(o[1], o[2], o[3], 1)
+        fs:ClearAllPoints()
+        fs:SetPoint("TOPLEFT", l.holder, "TOPLEFT",
+            OUTLINE_OFFSETS[i][1], OUTLINE_OFFSETS[i][2])
+    end
+    local w, h = l.outline[1]:GetStringWidth(), l.outline[1]:GetStringHeight()
+    l.holder:SetSize(w, h)
+    l.holder:ClearAllPoints()
+    l.holder:SetPoint("CENTER", frame, "TOPLEFT", x, y)
+
+    local slices = 1
+    if vertical then
+        local span = math.max(math.abs(b[1] - a[1]), math.abs(b[2] - a[2]),
+            math.abs(b[3] - a[3])) * 255
+        slices = math.min(MAX_BANDS, math.max(1, math.ceil(span / BAND_LEVELS)))
+    end
+    while #l.bands < slices do
+        local clip = CreateFrame("Frame", nil, l.holder)
+        clip:SetClipsChildren(true)
+        l.bands[#l.bands + 1] = { clip = clip, fs = Text(clip, "OVERLAY") }
+    end
+    local inline = gradient and not vertical and Inline(label.name, a, b)
+    for i, band in ipairs(l.bands) do
+        if i > slices then
+            band.clip:Hide()
+        else
+            local c = a
+            if vertical then
+                local t = slices > 1 and (i - 1) / (slices - 1) or 0
+                c = {}
+                for k = 1, 3 do c[k] = a[k] + (b[k] - a[k]) * t end
+            end
+            -- Each band runs one screen pixel into the next, so a fractional
+            -- clip edge cannot open a gap; the next band draws over the overlap.
+            -- The last band also covers the descent below the holder (the
+            -- tail of a G, say), which the holder height does not include.
+            local overlap = 1 / frame:GetEffectiveScale()
+            local bottom = i == slices and h + size or i * h / slices + overlap
+            band.clip:SetSize(w + 4, bottom - (i - 1) * h / slices)
+            band.clip:ClearAllPoints()
+            band.clip:SetPoint("TOPLEFT", l.holder, "TOPLEFT",
+                -2, -(i - 1) * h / slices)
+            band.clip:Show()
+            band.fs:SetFont(FONT, size, "")
+            band.fs:SetText(inline or label.name)
+            if inline then
+                band.fs:SetTextColor(1, 1, 1, 1)
+            else
+                band.fs:SetTextColor(c[1], c[2], c[3], 1)
+            end
+            band.fs:ClearAllPoints()
+            band.fs:SetPoint("TOPLEFT", l.holder, "TOPLEFT")
+        end
+    end
+    l.holder:Show()
 end
 
 --- Size multiplier for a label of *kind*: the Global label scale, times that
@@ -198,10 +319,16 @@ function MapLabels:Refresh()
 
     local w, h = canvas:GetSize()
     for i, label in ipairs(labels) do
-        labelTextures[i] = labelTextures[i] or frame:CreateTexture(nil, "ARTWORK")
-        Layout(labelTextures[i], label, label.u * w, -label.v * h, LabelScale(label.kind))
+        local l = labelFrames[i]
+        if not l then
+            l = NewLabel()
+            labelFrames[i] = l
+        end
+        Paint(l, label, label.u * w, -label.v * h, LabelScale(label.kind))
     end
-    for i = #labels + 1, #labelTextures do labelTextures[i]:Hide() end
+    for i = #labels + 1, #labelFrames do
+        labelFrames[i].holder:Hide()
+    end
 end
 
 --- Re-lay the labels on every canvas zoom step, for Auto-scale. Called once

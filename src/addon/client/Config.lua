@@ -135,9 +135,10 @@ Config.DEFAULTS = {
     showContinentNames = true,
     showCapitalCities = true,
     showTownsHubs = true,
-    -- Global label scale: multiplier (0.5..2) on every label, set in Options.
-    -- Multiplies each type's own scale below. See MapLabels.lua's Layout.
-    labelScale = 1,
+    -- Global label scale: multiplier (1..4) on every label. Options shows it
+    -- halved, so the default 2 reads as 100%. Multiplies each type's own
+    -- scale below. See MapLabels.lua's LabelScale.
+    labelScale = 2,
     -- Per-type label scales (0.5..2), each on top of labelScale.
     continentLabelScale = 1,
     capitalLabelScale = 1,
@@ -148,6 +149,26 @@ Config.DEFAULTS = {
     continentAutoScale = false,
     capitalAutoScale = false,
     townAutoScale = false,
+    -- Per-type label colour: Mode is "solid" (Color) or "gradient" (Color to
+    -- Color2, along GradientDir: "HORIZONTAL" left to right, "VERTICAL" top
+    -- to bottom). {r, g, b} 0..1. The default Color is the gold the labels
+    -- are drawn in. See MapLabels.lua's Paint.
+    continentLabelColorMode = "gradient",
+    continentLabelColor = { 252 / 255, 230 / 255, 120 / 255 },
+    continentLabelColor2 = { 1, 200 / 255, 90 / 255 },
+    continentLabelGradientDir = "VERTICAL",
+    capitalLabelColorMode = "gradient",
+    capitalLabelColor = { 252 / 255, 230 / 255, 120 / 255 },
+    capitalLabelColor2 = { 1, 200 / 255, 90 / 255 },
+    capitalLabelGradientDir = "VERTICAL",
+    townLabelColorMode = "gradient",
+    townLabelColor = { 252 / 255, 230 / 255, 120 / 255 },
+    townLabelColor2 = { 1, 200 / 255, 90 / 255 },
+    townLabelGradientDir = "VERTICAL",
+    -- Outline colour per type ({r, g, b}); the default is the baked brown.
+    continentLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
+    capitalLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
+    townLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
     -- "Show on SD" (Options): labels stay fully visible across the whole HD/SD
     -- blend, not just its HD half. See MapLabels' LabelAlpha.
     labelShowOnSD = false,
