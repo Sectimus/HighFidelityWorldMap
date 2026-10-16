@@ -188,6 +188,13 @@ end
 -- destructive action. ResetProfile resets the current profile in place and
 -- fires OnProfileReset (-> Config:RefreshProfile); the rest is state that
 -- RefreshProfile doesn't cover. mapFade is a game CVar, not in the profile.
+local function RefreshAfterReset()
+    ns.ToggleButton:Refresh()
+    ns.Coords:Refresh()
+    ns.KeepCentered:Refresh()
+    ns.CaveRenderer:ApplyAlpha()
+    ns.CaveRenderer:Relayout()
+end
 StaticPopupDialogs["HFWM_RESET_SETTINGS"] = {
     text = "Reset all High Fidelity World Map settings to their defaults?\n"
         .. "Any unsaved changes will be lost.",
@@ -196,11 +203,27 @@ StaticPopupDialogs["HFWM_RESET_SETTINGS"] = {
     OnAccept = function()
         _G.SetCVar("mapFade", "1")
         Config.dbObj:ResetProfile()
-        ns.ToggleButton:Refresh()
-        ns.Coords:Refresh()
-        ns.KeepCentered:Refresh()
-        ns.CaveRenderer:ApplyAlpha()
-        ns.CaveRenderer:Relayout()
+        RefreshAfterReset()
+    end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+}
+-- One page's worth of the above: restores just that page's `keys` (see
+-- MAIN_PAGE/SUB_PAGES), passed in as the popup's data.
+StaticPopupDialogs["HFWM_RESET_PAGE"] = {
+    text = "Reset the %s settings to their defaults?\n"
+        .. "Settings on other pages are left alone.",
+    button1 = ACCEPT,
+    button2 = CANCEL,
+    OnAccept = function(_, page)
+        for _, key in ipairs(page.keys) do
+            Config.db[key] = Config.DEFAULTS[key]
+        end
+        if page.onReset then page.onReset() end
+        Config:RefreshProfile()
+        RefreshAfterReset()
     end,
     timeout = 0,
     whileDead = true,
@@ -388,8 +411,9 @@ local options = {
                     order = 12,
                     type = "toggle",
                     name = "Show on SD",
-                    desc = "Keeps the extra labels visible when the map is "
-                        .. "showing SD tiles. Off, they show only on HD.",
+                    desc = "Keeps the extra labels fully visible on SD maps, "
+                        .. "not just HD. Off, they fade in as the HD/SD "
+                        .. "slider passes 50%.",
                     disabled = function() return not Config.db.showLocationNames end,
                     get = function() return Config.db.labelShowOnSD end,
                     set = function(_, value)
@@ -730,6 +754,49 @@ for key, option in pairs(options.args) do
         option.disabled = function() return not Config.db.enabled end
     end
 end
+
+-- The client's Settings panel splits this up: the main page keeps the
+-- general settings, and Extra Labels, Cave Map, Instance Map and Profiles
+-- each get their own sub page under it (registered in Init). `options`
+-- itself stays the full table, which the standalone /hfwm options window
+-- shows on one page. All of them share the same arg tables, so the
+-- disabled rules above apply everywhere.
+--
+-- `keys` are the Config.db fields a page's Reset to Defaults restores (a
+-- key with no DEFAULTS entry, like toggleButtonPoint, is cleared). Profiles
+-- has none: it has its own reset.
+local MAIN_APP = addonName .. "_Main"
+local MAIN_PAGE = {
+    title = PANEL_TITLE,
+    keys = {
+        "enabled", "rememberMapZoomPan", "additionalZoomLevels",
+        "keepCentered", "showPlayerCoords", "showMouseCoords",
+        "toggleButtonEnabled", "toggleButtonMovable", "toggleButtonPoint",
+        "mapBackground", "zoneMapBackground", "continentMapBackground",
+        "worldMapBackground", "worldMapClarity", "continentMapClarity",
+        "fogOfWarEnabled", "worldFogOfWar", "continentFogOfWar",
+    },
+    -- mapFade is a game CVar, not a profile field.
+    onReset = function() _G.SetCVar("mapFade", "1") end,
+}
+local SUB_PAGES = {
+    { key = "extraLabels", title = "Extra Labels",
+      keys = { "showLocationNames", "labelShowOnSD", "labelAutoScale",
+               "labelScale" } },
+    { key = "cave", title = "Cave Map",
+      keys = { "caveEnabled", "caveAutoOpen", "caveRememberState",
+               "caveKeepOpen", "cavePlacement", "caveOtherIndoors",
+               "caveAlpha", "caveWindowScale", "caveWindowPoint" } },
+    { key = "instance", title = "Instance Map (beta)",
+      keys = { "instanceDungeonEnabled", "instanceRaidEnabled" } },
+    { key = "profiles", title = "Profiles" },
+}
+for _, page in ipairs(SUB_PAGES) do page.app = addonName .. "_" .. page.key end
+local mainOptions = { type = "group", name = PANEL_TITLE, args = {} }
+for key, option in pairs(options.args) do
+    mainOptions.args[key] = option
+end
+for _, page in ipairs(SUB_PAGES) do mainOptions.args[page.key] = nil end
 for key, option in pairs(mapBackgroundArgs) do
     if option.disabled then
         local notHybrid = option.disabled
@@ -745,12 +812,16 @@ local LOGO = "Interface\\AddOns\\" .. addonName .. "\\Assets\\logo_lowres.dxt5.b
 --- and dock a "Reset to Defaults" button opposite it, top-right, vertically
 --- centered on the logo. Title is hidden via alpha, not cleared:
 --- AceConfigDialog re-sets its text on every redraw.
-local function ShowLogo(frame)
+--- `reset`: a page (resets just its own settings), `true` (resets
+--- everything, for the one-page standalone window) or nil (no button, for
+--- Profiles, which has its own reset).
+local function ShowLogo(frame, reset)
     frame.obj.label:SetAlpha(0)
     local logo = frame:CreateTexture(nil, "OVERLAY")
     logo:SetTexture(LOGO)
     logo:SetSize(144, 36)
     logo:SetPoint("TOPLEFT", 10, -4)
+    if not (reset and (reset == true or reset.keys)) then return end
 
     local button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     button:SetText("Reset to Defaults")
@@ -758,7 +829,11 @@ local function ShowLogo(frame)
     -- -11: vertically centered on the logo (TOPLEFT -4, height 36).
     button:SetPoint("TOPRIGHT", -10, -11)
     button:SetScript("OnClick", function()
-        StaticPopup_Show("HFWM_RESET_SETTINGS")
+        if reset == true then
+            StaticPopup_Show("HFWM_RESET_SETTINGS")
+        else
+            StaticPopup_Show("HFWM_RESET_PAGE", reset.title, nil, reset)
+        end
     end)
 end
 
@@ -769,15 +844,14 @@ end
 --- (ADDON_ACTION_FORBIDDEN SetPreferredGamepadInteractTarget). Nothing here
 --- opens the panel by name, so the client's own ID is kept. The widget is
 --- still listed in AceConfigDialog.BlizOptions so NotifyChange redraws it.
---- Returns the canvas frame the first time, nil after that.
-local panelGroup
-local function RegisterClientPanel(AceConfigDialog)
-    if panelGroup then return nil end
+--- With `parentCategory` the page is registered as a sub page under it.
+--- Returns the canvas frame and the Settings category.
+local function RegisterClientPanel(AceConfigDialog, appName, title, parentCategory)
     local group = LibStub("AceGUI-3.0"):Create("BlizOptionsGroup")
-    group:SetTitle(PANEL_TITLE)
-    group:SetUserData("appName", addonName)
+    group:SetTitle(title)
+    group:SetUserData("appName", appName)
     group:SetCallback("OnShow", function(widget)
-        AceConfigDialog:Open(addonName, widget)
+        AceConfigDialog:Open(appName, widget)
     end)
     group:SetCallback("OnHide", function(widget)
         -- Deferred: this runs inside Blizzard's Settings close chain, and addon
@@ -788,51 +862,83 @@ local function RegisterClientPanel(AceConfigDialog)
         end)
     end)
 
-    local category = Settings.RegisterCanvasLayoutCategory(group.frame, PANEL_TITLE)
-    group:SetName(category.ID)
-    Settings.RegisterAddOnCategory(category)
+    local category
+    if parentCategory then
+        category = Settings.RegisterCanvasLayoutSubcategory(parentCategory, group.frame, title)
+        group:SetName(category.ID, parentCategory.ID)
+    else
+        category = Settings.RegisterCanvasLayoutCategory(group.frame, title)
+        group:SetName(category.ID)
+        Settings.RegisterAddOnCategory(category)
+    end
 
-    AceConfigDialog.BlizOptions[addonName] = AceConfigDialog.BlizOptions[addonName] or {}
-    AceConfigDialog.BlizOptions[addonName][addonName] = group
-    AceConfigDialog.BlizOptionsIDMap[PANEL_TITLE] = category.ID
-    panelGroup = group
-    return group.frame
+    AceConfigDialog.BlizOptions[appName] = AceConfigDialog.BlizOptions[appName] or {}
+    AceConfigDialog.BlizOptions[appName][appName] = group
+    AceConfigDialog.BlizOptionsIDMap[title] = category.ID
+    return group.frame, category
 end
 
---- Register the options table and hook it into the client's own options
+local registered
+--- Register the options tables and hook them into the client's own options
 --- UI. Safe to call more than once.
 function Options:Init()
     if not options.args.profiles then
-        options.args.profiles = LibStub("AceDBOptions-3.0"):GetOptionsTable(
+        local profiles = LibStub("AceDBOptions-3.0"):GetOptionsTable(
             Config.dbObj)
-        options.args.profiles.order = 100
+        profiles.order = 100
         -- Inline: with no tab/tree child groups AceConfigDialog wraps the
         -- whole page in one ScrollFrame, instead of squeezing a tree
         -- under the settings above.
-        options.args.profiles.inline = true
+        profiles.inline = true
+        options.args.profiles = profiles
     end
 
-    LibStub("AceConfigRegistry-3.0"):RegisterOptionsTable(addonName, options)
+    local registry = LibStub("AceConfigRegistry-3.0")
+    registry:RegisterOptionsTable(addonName, options)
+    registry:RegisterOptionsTable(MAIN_APP, mainOptions)
+    for _, page in ipairs(SUB_PAGES) do
+        local src = options.args[page.key]
+        -- The page itself is the section's group, so it isn't boxed twice.
+        registry:RegisterOptionsTable(page.app, {
+            type = "group", name = page.title, disabled = src.disabled,
+            handler = src.handler, args = src.args,
+        })
+    end
 
     local AceConfigDialog = LibStub("AceConfigDialog-3.0")
-    -- Standalone window only; the client's options panel sets its own size.
+    -- Standalone window only; the client's options panels set their own size.
     AceConfigDialog:SetDefaultSize(addonName, 700, 650)
-    local ok, blizFrame = pcall(RegisterClientPanel, AceConfigDialog)
+    if registered then return end
+    local frames = {}
+    local ok, err = pcall(function()
+        local frame, category = RegisterClientPanel(
+            AceConfigDialog, MAIN_APP, PANEL_TITLE)
+        frames[#frames + 1] = { frame, MAIN_PAGE }
+        for _, page in ipairs(SUB_PAGES) do
+            frame = RegisterClientPanel(
+                AceConfigDialog, page.app, page.title, category)
+            frames[#frames + 1] = { frame, page }
+        end
+    end)
+    registered = ok
     self.clientRegistered = ok
-    if ok and blizFrame then ShowLogo(blizFrame) end
+    for _, f in ipairs(frames) do ShowLogo(f[1], f[2]) end
 end
 --- Open the options, wherever they ended up living. The standalone window
---- gets the same logo + Reset to Defaults treatment as the client's own
---- options panel.
+--- shows everything on one page, with the same logo + Reset to Defaults
+--- treatment as the client's own options panel.
 function Options:Open()
     local AceConfigDialog = LibStub("AceConfigDialog-3.0")
     AceConfigDialog:Open(addonName)
     local frame = AceConfigDialog.OpenFrames[addonName]
-    if frame then ShowLogo(frame) end
+    if frame then ShowLogo(frame, true) end
 end
 
 --- Push a live setting change (from a slash command, say) out to any open
 --- options window. Safe to call whether or not one is open.
 function Options:Refresh()
-    LibStub("AceConfigRegistry-3.0"):NotifyChange(addonName)
+    local registry = LibStub("AceConfigRegistry-3.0")
+    registry:NotifyChange(addonName)
+    registry:NotifyChange(MAIN_APP)
+    for _, page in ipairs(SUB_PAGES) do registry:NotifyChange(page.app) end
 end

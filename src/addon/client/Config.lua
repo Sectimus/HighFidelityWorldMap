@@ -140,8 +140,8 @@ Config.DEFAULTS = {
     -- zoom in, from their Label Scale size at the loosest zoom step. See
     -- MapLabels.lua's LabelScale.
     labelAutoScale = false,
-    -- "Show on SD" (Options): keeps the extra labels up while the map is
-    -- showing SD tiles. Off, they show only while the HD side dominates.
+    -- "Show on SD" (Options): labels stay fully visible across the whole HD/SD
+    -- blend, not just its HD half. See MapLabels' LabelAlpha.
     labelShowOnSD = false,
 }
 -- The db also carries `caveWindowPoint` -- { left, top }, the window's

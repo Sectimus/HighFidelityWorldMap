@@ -56,14 +56,19 @@ local function LabelScale()
     return scale
 end
 
+--- Opacity of the labels. With Show on SD they are always fully visible.
+--- Otherwise they fade in with the HD side of the blend, from 50% up to 100%.
+local function LabelAlpha()
+    if Config.db.labelShowOnSD then return 1 end
+    return math.max(0, math.min(1, (Config:GetAlpha() - 0.5) * 2))
+end
+
 --- Show or hide the labels for the map now on screen. Safe to call at any
 --- time, before the map has ever been opened included.
 function MapLabels:Refresh()
     local canvas = WorldMapFrame.ScrollContainer
         and WorldMapFrame.ScrollContainer.Child
     local labels = canvas and Config.db.enabled and Config.db.showLocationNames
-        -- HD only, as ToggleButton's HDShowing reads it, unless Show on SD.
-        and (Config.db.labelShowOnSD or Config:GetAlpha() > 0.5)
         and LOCATION_NAMES[WorldMapFrame:GetMapID() or 0]
     if not labels then
         if frame then frame:Hide() end
@@ -80,6 +85,7 @@ function MapLabels:Refresh()
     frame:SetAllPoints(canvas)
     frame:SetFrameLevel(canvas:GetFrameLevel() + 501)
     frame:Show()
+    frame:SetAlpha(LabelAlpha())
 
     local w, h = canvas:GetSize()
     for i, label in ipairs(labels) do
