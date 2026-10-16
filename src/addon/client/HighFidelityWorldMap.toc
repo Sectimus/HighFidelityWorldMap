@@ -38,6 +38,7 @@ data/ZoneOverlayTiles.lua
 data/ZoneShapes.lua
 data/CaveData.lua
 data/IndoorData.lua
+data/MapLabelData.lua
 Namespace.lua
 Config.lua
 TexturePool.lua

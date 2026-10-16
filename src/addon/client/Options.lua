@@ -49,13 +49,13 @@ end
 --- settings.
 local function NoLabelsOn()
     return not (Config.db.showContinentNames or Config.db.showCapitalCities
-        or Config.db.showTownsHubs)
+        or Config.db.showTownsHubs or Config.db.showSubzoneNames)
 end
 
 local SECTION_RESET = "HFWM-SectionReset"  -- registered below, with the widgets
 -- The Config.db fields of each label kind: the show toggle, scale, Auto-scale
 -- and the prefix of its <color>ColorMode / Color / Color2 / GradientDir /
--- Outline fields.
+-- Outline / TrueBorder fields.
 local LABEL_KINDS = {
     continent = { show = "showContinentNames", scale = "continentLabelScale",
                   auto = "continentAutoScale", color = "continentLabel" },
@@ -63,12 +63,14 @@ local LABEL_KINDS = {
                   auto = "capitalAutoScale", color = "capitalLabel" },
     town      = { show = "showTownsHubs", scale = "townLabelScale",
                   auto = "townAutoScale", color = "townLabel" },
+    subzone   = { show = "showSubzoneNames", scale = "subzoneLabelScale",
+                  auto = "subzoneAutoScale", color = "subzoneLabel" },
 }
 
 --- Every Config.db field of one label kind, for Reset to defaults.
 local function LabelKeys(k)
     local keys = { k.show, k.scale, k.auto }
-    for _, suffix in ipairs({ "ColorMode", "Color", "Color2", "GradientDir", "Outline" }) do
+    for _, suffix in ipairs({ "ColorMode", "Color", "Color2", "GradientDir", "Outline", "TrueBorder" }) do
         keys[#keys + 1] = k.color .. suffix
     end
     return keys
@@ -189,13 +191,29 @@ local function LabelSection(order, title, k, desc)
                     ns.MapLabels:Refresh()
                 end,
             },
-            outline = {
+            trueBorder = {
                 order = 33,
+                type = "toggle",
+                name = "True Border",
+                desc = "Draws the font's own thick outline, which grows with the "
+                    .. "label's text. Off, the border is a copy of the text in "
+                    .. "the Outline colour.",
+                disabled = function() return not Config.db[showKey] end,
+                get = function() return Config.db[colorKey .. "TrueBorder"] end,
+                set = function(_, value)
+                    Config.db[colorKey .. "TrueBorder"] = value
+                    ns.MapLabels:Refresh()
+                end,
+            },
+            outline = {
+                order = 36,
                 width = 0.75,
                 type = "color",
                 name = "Outline colour",
-                desc = "Colour of the outline around these labels.",
-                disabled = function() return not Config.db[showKey] end,
+                desc = "Colour of the outline around these labels. Needs True Border off.",
+                disabled = function()
+                    return not Config.db[showKey] or Config.db[colorKey .. "TrueBorder"]
+                end,
                 get = function() return unpack(Config.db[colorKey .. "Outline"]) end,
                 set = function(_, r, g, b)
                     Config.db[colorKey .. "Outline"] = { r, g, b }
@@ -672,6 +690,12 @@ local options = {
                     LABEL_KINDS.town,
                     "Shows the names of towns and hubs, such as "
                         .. "Goldshire and Northshire."),
+                subzoneLabels = LabelSection(23, "Subzones",
+                    LABEL_KINDS.subzone,
+                    "Shows the names of outdoor areas inside a zone, such as "
+                        .. "Gol'Bolar Quarry. They fade in from the first "
+                        .. "additional zoom level, so they need Additional "
+                        .. "zoom levels on."),
             },
         },
         cave = {

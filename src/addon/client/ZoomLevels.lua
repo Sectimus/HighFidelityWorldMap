@@ -84,6 +84,7 @@ end
 --- index Blizzard's own final level used.
 ---@param sc table the ScrollContainer instance (its own `self`)
 local function ExtendZoomLevels(sc)
+    ZoomLevels.extra = nil
     -- Off under the gamepad UI: any entry added to Blizzard's zoomLevels is
     -- tainted, the map's own focus/binding flows then read it (via
     -- GetScaleForMaxZoom) and run tainted, and the stick-zoom binding stops
@@ -106,6 +107,12 @@ local function ExtendZoomLevels(sc)
             layerIndex = lastLevel.layerIndex,
         }
     end
+    -- Scales of the first and last additional steps, for MapLabels' subzone
+    -- fade. Nil whenever no additional steps are on the ladder.
+    ZoomLevels.extra = {
+        from = levels[#levels - EXTRA_STEPS + 1].scale,
+        to = levels[#levels].scale,
+    }
 end
 
 --- Force the ladder to rebuild right now, so toggling the option in Options
