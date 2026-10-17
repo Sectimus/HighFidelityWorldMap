@@ -132,7 +132,7 @@ Config.DEFAULTS = {
 
     -- Labels (MapLabels.lua): names drawn on the map over its art, in four
     -- groups: continent names, capital cities, towns and hubs, and subzones.
-    showContinentNames = true,
+    showContinentNames = false,
     showCapitalCities = true,
     showTownsHubs = true,
     showSubzoneNames = true,
@@ -140,18 +140,18 @@ Config.DEFAULTS = {
     -- halved, so the default 2 reads as 100%. Multiplies each type's own
     -- scale below. See MapLabels.lua's LabelScale.
     labelScale = 2,
-    -- Per-type label scales (0.5..2), each on top of labelScale.
+    -- Per-type label scales, each on top of labelScale. Stored as the actual
+    -- multiplier; the Options sliders show each as a percent of its default.
     continentLabelScale = 1,
-    capitalLabelScale = 1,
-    townLabelScale = 1,
-    subzoneLabelScale = 1,
+    capitalLabelScale = 1.15,
+    townLabelScale = 1.3,
+    subzoneLabelScale = 0.18,
     -- Auto-scale per label type: labels grow as you zoom out and shrink as you
     -- zoom in, from their label scale at the loosest zoom step. See
     -- MapLabels.lua's LabelScale.
     continentAutoScale = false,
     capitalAutoScale = false,
     townAutoScale = false,
-    subzoneAutoScale = false,
     -- Per-type label colour: Mode is "solid" (Color) or "gradient" (Color to
     -- Color2, along GradientDir: "HORIZONTAL" left to right, "VERTICAL" top
     -- to bottom). {r, g, b} 0..1. The default Color is the gold the labels
@@ -168,20 +168,15 @@ Config.DEFAULTS = {
     townLabelColor = { 252 / 255, 230 / 255, 120 / 255 },
     townLabelColor2 = { 1, 200 / 255, 90 / 255 },
     townLabelGradientDir = "VERTICAL",
-    subzoneLabelColorMode = "gradient",
-    subzoneLabelColor = { 252 / 255, 230 / 255, 120 / 255 },
+    subzoneLabelColorMode = "solid",
+    subzoneLabelColor = { 1, 247 / 255, 227 / 255 },
     subzoneLabelColor2 = { 1, 200 / 255, 90 / 255 },
     subzoneLabelGradientDir = "VERTICAL",
-    -- Border per type. True Border draws the font's own thick outline, which
-    -- grows with the text. Off, the border is copies of the text in the
-    -- Outline colour (see MapLabels.lua's Paint).
-    continentLabelTrueBorder = true,
+    -- Border per type: copies of the text in the Outline colour, BORDER_RATIO of
+    -- the font size out (see MapLabels.lua's Paint).
     continentLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
-    capitalLabelTrueBorder = true,
     capitalLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
-    townLabelTrueBorder = true,
     townLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
-    subzoneLabelTrueBorder = true,
     subzoneLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
     -- Fade when zoomed, per type: capital and town labels fade out as the map
     -- is zoomed in, subzone labels fade in over the additional zoom levels.

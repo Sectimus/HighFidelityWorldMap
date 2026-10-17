@@ -55,22 +55,23 @@ end
 local SECTION_RESET = "HFWM-SectionReset"  -- registered below, with the widgets
 -- The Config.db fields of each label kind: the show toggle, scale, Auto-scale
 -- and the prefix of its <color>ColorMode / Color / Color2 / GradientDir /
--- Outline / TrueBorder fields.
+-- Outline fields.
 local LABEL_KINDS = {
     continent = { show = "showContinentNames", scale = "continentLabelScale",
                   auto = "continentAutoScale", color = "continentLabel" },
     capital   = { show = "showCapitalCities", scale = "capitalLabelScale",
                   auto = "capitalAutoScale", color = "capitalLabel",
-                  fade = "Fades these labels out as you zoom in, from 10% to "
-                      .. "20% of the zoom range (50% is where the additional "
-                      .. "zoom levels start). Off, they stay visible." },
+                  fade = "Fades these labels out as you zoom in: capital at "
+                      .. "60% one step in, gone at the next. Town and hub at "
+                      .. "60% two steps further in, gone one step after that. "
+                      .. "Off, they stay visible." },
     town      = { show = "showTownsHubs", scale = "townLabelScale",
                   auto = "townAutoScale", color = "townLabel",
-                  fade = "Fades these labels out as you zoom in, from 20% to "
-                      .. "50% of the zoom range (50% is where the additional "
-                      .. "zoom levels start). Off, they stay visible." },
+                  fade = "Fades these labels out as you zoom in: town and hub "
+                      .. "start at the second step, 60% at the third, gone at "
+                      .. "the fourth. Off, they stay visible." },
     subzone   = { show = "showSubzoneNames", scale = "subzoneLabelScale",
-                  auto = "subzoneAutoScale", color = "subzoneLabel",
+                  color = "subzoneLabel",
                   fade = "Fades these labels in over the additional zoom "
                       .. "levels, starting at the first one (50% of the zoom "
                       .. "range). Off, they show at every zoom. Needs "
@@ -79,8 +80,9 @@ local LABEL_KINDS = {
 
 --- Every Config.db field of one label kind, for Reset to defaults.
 local function LabelKeys(k)
-    local keys = { k.show, k.scale, k.auto }
-    for _, suffix in ipairs({ "ColorMode", "Color", "Color2", "GradientDir", "Outline", "TrueBorder" }) do
+    local keys = { k.show, k.scale }
+    if k.auto then keys[#keys + 1] = k.auto end
+    for _, suffix in ipairs({ "ColorMode", "Color", "Color2", "GradientDir", "Outline" }) do
         keys[#keys + 1] = k.color .. suffix
     end
     if k.fade then keys[#keys + 1] = k.color .. "ZoomFade" end
@@ -138,6 +140,7 @@ local function LabelSection(order, title, k, desc)
                 desc = "Grows these labels as you zoom out and shrinks them "
                     .. "as you zoom in, starting from the label scale at the "
                     .. "loosest zoom.",
+                hidden = function() return not k.auto end,
                 disabled = function() return not Config.db[showKey] end,
                 get = function() return Config.db[autoKey] end,
                 set = function(_, value)
@@ -146,7 +149,8 @@ local function LabelSection(order, title, k, desc)
                 end,
             },
             zoomFade = {
-                order = 17,
+                order = 35,
+                width = "full",
                 type = "toggle",
                 name = "Fade when zoomed",
                 desc = k.fade,
@@ -166,9 +170,9 @@ local function LabelSection(order, title, k, desc)
                     .. "size. Applies on top of the Global label scale.",
                 min = 0.5, max = 2, step = 0.05, isPercent = true,
                 disabled = function() return not Config.db[showKey] end,
-                get = function() return Config.db[scaleKey] end,
+                get = function() return Config.db[scaleKey] / Config.DEFAULTS[scaleKey] end,
                 set = function(_, value)
-                    Config.db[scaleKey] = value
+                    Config.db[scaleKey] = value * Config.DEFAULTS[scaleKey]
                     ns.MapLabels:Refresh()
                 end,
             },
@@ -191,7 +195,7 @@ local function LabelSection(order, title, k, desc)
                 type = "color",
                 name = function()
                     return Config.db[colorKey .. "ColorMode"] == "gradient"
-                        and "Colour 1" or "Colour"
+                        and "#1" or "Colour"
                 end,
                 disabled = function() return not Config.db[showKey] end,
                 get = function() return unpack(Config.db[colorKey .. "Color"]) end,
@@ -204,7 +208,7 @@ local function LabelSection(order, title, k, desc)
                 order = 32,
                 width = 0.5,
                 type = "color",
-                name = "Colour 2",
+                name = "#2",
                 hidden = function()
                     return Config.db[colorKey .. "ColorMode"] ~= "gradient"
                 end,
@@ -215,29 +219,13 @@ local function LabelSection(order, title, k, desc)
                     ns.MapLabels:Refresh()
                 end,
             },
-            trueBorder = {
-                order = 33,
-                type = "toggle",
-                name = "True Border",
-                desc = "Draws the font's own thick outline, which grows with the "
-                    .. "label's text. Off, the border is a copy of the text in "
-                    .. "the Outline colour.",
-                disabled = function() return not Config.db[showKey] end,
-                get = function() return Config.db[colorKey .. "TrueBorder"] end,
-                set = function(_, value)
-                    Config.db[colorKey .. "TrueBorder"] = value
-                    ns.MapLabels:Refresh()
-                end,
-            },
             outline = {
-                order = 36,
-                width = 0.75,
+                order = 33,
+                width = 0.5,
                 type = "color",
-                name = "Outline colour",
-                desc = "Colour of the outline around these labels. Needs True Border off.",
-                disabled = function()
-                    return not Config.db[showKey] or Config.db[colorKey .. "TrueBorder"]
-                end,
+                name = "Outline",
+                desc = "Colour of the outline around these labels.",
+                disabled = function() return not Config.db[showKey] end,
                 get = function() return unpack(Config.db[colorKey .. "Outline"]) end,
                 set = function(_, r, g, b)
                     Config.db[colorKey .. "Outline"] = { r, g, b }

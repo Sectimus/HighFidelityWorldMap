@@ -35,7 +35,7 @@ local KIND = {
     town      = { show = "showTownsHubs", scale = "townLabelScale",
                   auto = "townAutoScale", color = "townLabel" },
     subzone   = { show = "showSubzoneNames", scale = "subzoneLabelScale",
-                  auto = "subzoneAutoScale", color = "subzoneLabel" },
+                  color = "subzoneLabel" },
 }
 
 local FONT = "Fonts\\FRIZQT__.TTF"
@@ -49,15 +49,18 @@ local FONT_PER_H = 0.85
 -- more than 80 levels will show steps. Raise MAX_BANDS to fix.
 local BAND_LEVELS = 2
 local MAX_BANDS = 40
--- The copy outline: the text drawn at one-unit offsets behind the fill, in the
--- Outline colour. Used when a kind's True Border is off.
+-- The border: copies of the text drawn at offsets behind the fill, in the
+-- Outline colour.
 local OUTLINE_OFFSETS = {
     { -1, -1 }, { -1, 0 }, { -1, 1 }, { 0, -1 },
     { 0, 1 }, { 1, -1 }, { 1, 0 }, { 1, 1 },
 }
 -- Outline padding around a label's clip frames, as a fraction of its font
--- size, for True Border. ponytail: a fixed fraction; raise it if it still clips.
+-- size. ponytail: a fixed fraction; raise it if it still clips.
 local OUTLINE_PAD = 0.2
+-- Border width as a share of the label's font size, so it thins with the text.
+-- ponytail: starting point, tune in game.
+local BORDER_RATIO = 0.05
 
 local frame
 local labelFrames = {}  -- [i] = { holder, outline = {FontString}, bands = {{clip, fs}} }
@@ -99,12 +102,16 @@ local function Inline(name, a, b)
 end
 
 --- Position and colour one label centred on (x, y) from the canvas's
---- top-left, at *scale*. The border is the font's thick outline (True Border)
---- or the copies in the Outline colour, per kind. The fill is the Color of its
---- kind, solid or gradient. A horizontal gradient is set in the text itself; a
---- vertical one is BANDS clipped copies, each in its band's colour from the top
---- (Color) to the bottom (Color2).
-local function Paint(l, label, x, y, scale)
+--- top-left, at *scale*. The border is copies of the text in the Outline colour,
+--- BORDER_RATIO of the font size out.
+--- The fill is the Color of its kind, solid or gradient. A horizontal gradient
+--- is set in the text itself; a vertical one is BANDS clipped copies, each in
+--- its band's colour from the top (Color) to the bottom (Color2). *opaque* is
+--- true when the label is drawn at full opacity. Bands blend twice where they
+--- meet once a label is translucent, which shows as a line at every seam, so a
+--- translucent vertical gradient is one string in the gradient's middle colour
+--- instead.
+local function Paint(l, label, x, y, scale, opaque)
     local key = KIND[label.kind].color
     local size = label.h * FONT_PER_H * scale
     local a = Config.db[key .. "Color"]
@@ -116,12 +123,11 @@ local function Paint(l, label, x, y, scale)
         dir = Config.db[key .. "GradientDir"]
     end
     local vertical = gradient and dir == "VERTICAL"
-    local trueBorder = Config.db[key .. "TrueBorder"]
-    local flags = trueBorder and "THICKOUTLINE" or ""
+    local banded = vertical and opaque
     local o = Config.db[key .. "Outline"]
 
     local slices = 1
-    if vertical then
+    if banded then
         local span = math.max(math.abs(b[1] - a[1]), math.abs(b[2] - a[2]),
             math.abs(b[3] - a[3])) * 255
         slices = math.min(MAX_BANDS, math.max(1, math.ceil(span / BAND_LEVELS)))
@@ -132,53 +138,53 @@ local function Paint(l, label, x, y, scale)
     end
 
     local first = l.bands[1].fs
-    first:SetFont(FONT, size, flags)
+    first:SetFont(FONT, size, "")
     first:SetText(label.name)
     local w, h = first:GetStringWidth(), first:GetStringHeight()
     l.holder:SetSize(w, h)
     l.holder:ClearAllPoints()
     l.holder:SetPoint("CENTER", frame, "TOPLEFT", x, y)
 
-    local pad = trueBorder and math.max(2, math.ceil(size * OUTLINE_PAD)) or 2
+    local pad = math.max(2, math.ceil(size * OUTLINE_PAD))
 
+    local bw = size * BORDER_RATIO
     for i, fs in ipairs(l.outline) do
-        fs:SetShown(not trueBorder)
-        if not trueBorder then
-            fs:SetFont(FONT, size, "")
-            fs:SetText(label.name)
-            fs:SetTextColor(o[1], o[2], o[3], 1)
-            fs:ClearAllPoints()
-            fs:SetPoint("TOPLEFT", l.holder, "TOPLEFT",
-                OUTLINE_OFFSETS[i][1], OUTLINE_OFFSETS[i][2])
-        end
+        fs:SetFont(FONT, size, "")
+        fs:SetText(label.name)
+        fs:SetTextColor(o[1], o[2], o[3], 1)
+        fs:ClearAllPoints()
+        fs:SetPoint("TOPLEFT", l.holder, "TOPLEFT",
+            OUTLINE_OFFSETS[i][1] * bw, OUTLINE_OFFSETS[i][2] * bw)
     end
     local inline = gradient and not vertical and Inline(label.name, a, b)
+    local overlap = 1 / frame:GetEffectiveScale()
     for i, band in ipairs(l.bands) do
         if i > slices then
             band.clip:Hide()
         else
             local c = a
-            if vertical then
+            if banded then
                 local t = slices > 1 and (i - 1) / (slices - 1) or 0
                 c = {}
                 for k = 1, 3 do c[k] = a[k] + (b[k] - a[k]) * t end
+            elseif vertical then
+                c = { (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, (a[3] + b[3]) / 2 }
             end
             -- Each band runs one screen pixel into the next, so a fractional
             -- clip edge cannot open a gap; the next band draws over the overlap.
-            -- Only vertical bands clip. The first and last extend by pad so the
+            -- Only banded labels clip. The first and last extend by pad so the
             -- outline is not cut at the label's ends; the last also covers the
             -- descent below the holder.
-            local overlap = 1 / frame:GetEffectiveScale()
             local top = (i - 1) * h / slices
             local bottom = i == slices and h + size or i * h / slices + overlap
             local up = i == 1 and pad or 0
             local down = i == slices and pad or 0
-            band.clip:SetClipsChildren(vertical)
+            band.clip:SetClipsChildren(banded)
             band.clip:SetSize(w + 2 * pad, bottom - top + up + down)
             band.clip:ClearAllPoints()
             band.clip:SetPoint("TOPLEFT", l.holder, "TOPLEFT", -pad, up - top)
             band.clip:Show()
-            band.fs:SetFont(FONT, size, flags)
+            band.fs:SetFont(FONT, size, "")
             band.fs:SetText(inline or label.name)
             if inline then
                 band.fs:SetTextColor(1, 1, 1, 1)
@@ -192,6 +198,15 @@ local function Paint(l, label, x, y, scale)
     l.holder:Show()
 end
 
+--- Fade one label to *alpha*. The outline is dark copies behind the fill, so a
+--- translucent fill over it reads as dimmed. The outline fades out by half-way
+--- instead, leaving the fill translucent over the map alone.
+local function Fade(l, alpha)
+    local halo = math.max(0, math.min(1, (alpha - 0.5) * 2))
+    for _, fs in ipairs(l.outline) do fs:SetAlpha(halo) end
+    for _, band in ipairs(l.bands) do band.clip:SetAlpha(alpha) end
+end
+
 --- Size multiplier for a label of *kind*: the Global label scale, times that
 --- kind's own label scale, times the inverse of the canvas zoom against its
 --- loosest step when the kind's Auto-scale is on. The art and the labels
@@ -199,7 +214,8 @@ end
 --- Auto-scale grows it back by that ratio, and zooming in shrinks it.
 local function LabelScale(kind)
     local scale = Config.db.labelScale * Config.db[KIND[kind].scale]
-    if not Config.db[KIND[kind].auto] then return scale end
+    local auto = KIND[kind].auto
+    if not (auto and Config.db[auto]) then return scale end
     local sc = WorldMapFrame.ScrollContainer
     local levels = sc and sc.zoomLevels
     local base = levels and levels[1] and levels[1].scale
@@ -215,31 +231,40 @@ local function LabelAlpha()
     return math.max(0, math.min(1, (Config:GetAlpha() - 0.5) * 2))
 end
 
---- How far the canvas is zoomed in: 0 at the loosest step, 0.5 at Blizzard's
---- own tightest one. The additional zoom levels are the other half (0.5 to 1),
---- where only subzone labels show. 0 when the ladder has no range.
-local function ZoomProgress()
+--- Where the canvas sits on the zoom ladder, as a fractional step: 1 at the
+--- loosest step, 2 at the next, and so on. The additional zoom levels are
+--- steps too. Clamped to the ladder's ends.
+local function LadderStep()
     local sc = WorldMapFrame.ScrollContainer
     local levels = sc and sc.zoomLevels
-    local base = levels and levels[1] and levels[1].scale
-    local extra = ns.ZoomLevels.extra
-    local top = extra and extra.boundary
-        or (levels and levels[#levels] and levels[#levels].scale)
     local cur = sc and sc.currentScale
-    if not (base and top and cur) or top <= base then return 0 end
-    return 0.5 * math.max(0, math.min(1, (cur - base) / (top - base)))
+    if not (levels and cur and #levels > 0) then return 1 end
+    for k = 1, #levels - 1 do
+        local a, b = levels[k].scale, levels[k + 1].scale
+        if cur < b then return k + math.max(0, (cur - a) / (b - a)) end
+    end
+    return #levels
 end
 
--- Zoom progress at which a kind starts and finishes fading out, when its Fade
--- when zoomed option is on.
-local FADE_OUT = { capital = { 0.10, 0.20 }, town = { 0.20, 0.50 } }
+-- Opacity of capital and town labels by ladder step, when their Fade when
+-- zoomed option is on. Linear between the points; 1 before the first.
+local FADE_STEPS = {
+    capital = { { 1, 1 }, { 2, 0.6 }, { 3, 0 } },
+    town = { { 1, 1 }, { 2, 1 }, { 3, 0.6 }, { 4, 0 } },
+}
 
 --- Opacity from zoom for a capital or town label; 1 for any other kind, or
 --- with the kind's Fade when zoomed off.
-local function ZoomFade(kind, progress)
-    local band = FADE_OUT[kind]
-    if not band or not Config.db[KIND[kind].color .. "ZoomFade"] then return 1 end
-    return 1 - math.max(0, math.min(1, (progress - band[1]) / (band[2] - band[1])))
+local function ZoomFade(kind, step)
+    local keys = FADE_STEPS[kind]
+    if not keys or not Config.db[KIND[kind].color .. "ZoomFade"] then return 1 end
+    if step <= keys[1][1] then return keys[1][2] end
+    for i = 2, #keys do
+        local s0, a0 = keys[i - 1][1], keys[i - 1][2]
+        local s1, a1 = keys[i][1], keys[i][2]
+        if step <= s1 then return a0 + (a1 - a0) * (step - s0) / (s1 - s0) end
+    end
+    return keys[#keys][2]
 end
 
 --- Opacity of subzone labels: 0 at the first additional zoom level, rising
@@ -297,10 +322,11 @@ function MapLabels:Refresh()
     frame:SetAllPoints(canvas)
     frame:SetFrameLevel(canvas:GetFrameLevel() + 501)
     frame:Show()
-    frame:SetAlpha(LabelAlpha())
+    local frameAlpha = LabelAlpha()
+    frame:SetAlpha(frameAlpha)
 
     local subzoneAlpha = SubzoneAlpha()
-    local progress = ZoomProgress()
+    local step = LadderStep()
     local w, h = canvas:GetSize()
     for i, label in ipairs(labels) do
         local l = labelFrames[i]
@@ -308,9 +334,11 @@ function MapLabels:Refresh()
             l = NewLabel()
             labelFrames[i] = l
         end
-        Paint(l, label, label.u * w, -label.v * h, LabelScale(label.kind))
-        l.holder:SetAlpha(label.kind == "subzone" and subzoneAlpha
-            or ZoomFade(label.kind, progress))
+        local alpha = label.kind == "subzone" and subzoneAlpha
+            or ZoomFade(label.kind, step)
+        Paint(l, label, label.u * w, -label.v * h, LabelScale(label.kind),
+            alpha * frameAlpha >= 1)
+        Fade(l, alpha)
     end
     for i = #labels + 1, #labelFrames do
         labelFrames[i].holder:Hide()
