@@ -60,11 +60,21 @@ local LABEL_KINDS = {
     continent = { show = "showContinentNames", scale = "continentLabelScale",
                   auto = "continentAutoScale", color = "continentLabel" },
     capital   = { show = "showCapitalCities", scale = "capitalLabelScale",
-                  auto = "capitalAutoScale", color = "capitalLabel" },
+                  auto = "capitalAutoScale", color = "capitalLabel",
+                  fade = "Fades these labels out as you zoom in, from 10% to "
+                      .. "20% of the zoom range (50% is where the additional "
+                      .. "zoom levels start). Off, they stay visible." },
     town      = { show = "showTownsHubs", scale = "townLabelScale",
-                  auto = "townAutoScale", color = "townLabel" },
+                  auto = "townAutoScale", color = "townLabel",
+                  fade = "Fades these labels out as you zoom in, from 20% to "
+                      .. "50% of the zoom range (50% is where the additional "
+                      .. "zoom levels start). Off, they stay visible." },
     subzone   = { show = "showSubzoneNames", scale = "subzoneLabelScale",
-                  auto = "subzoneAutoScale", color = "subzoneLabel" },
+                  auto = "subzoneAutoScale", color = "subzoneLabel",
+                  fade = "Fades these labels in over the additional zoom "
+                      .. "levels, starting at the first one (50% of the zoom "
+                      .. "range). Off, they show at every zoom. Needs "
+                      .. "Additional zoom levels on." },
 }
 
 --- Every Config.db field of one label kind, for Reset to defaults.
@@ -73,6 +83,7 @@ local function LabelKeys(k)
     for _, suffix in ipairs({ "ColorMode", "Color", "Color2", "GradientDir", "Outline", "TrueBorder" }) do
         keys[#keys + 1] = k.color .. suffix
     end
+    if k.fade then keys[#keys + 1] = k.color .. "ZoomFade" end
     return keys
 end
 
@@ -131,6 +142,19 @@ local function LabelSection(order, title, k, desc)
                 get = function() return Config.db[autoKey] end,
                 set = function(_, value)
                     Config.db[autoKey] = value
+                    ns.MapLabels:Refresh()
+                end,
+            },
+            zoomFade = {
+                order = 17,
+                type = "toggle",
+                name = "Fade when zoomed",
+                desc = k.fade,
+                hidden = function() return not k.fade end,
+                disabled = function() return not Config.db[showKey] end,
+                get = function() return Config.db[colorKey .. "ZoomFade"] end,
+                set = function(_, value)
+                    Config.db[colorKey .. "ZoomFade"] = value
                     ns.MapLabels:Refresh()
                 end,
             },
@@ -693,9 +717,7 @@ local options = {
                 subzoneLabels = LabelSection(23, "Subzones",
                     LABEL_KINDS.subzone,
                     "Shows the names of outdoor areas inside a zone, such as "
-                        .. "Gol'Bolar Quarry. They fade in from the first "
-                        .. "additional zoom level, so they need Additional "
-                        .. "zoom levels on."),
+                        .. "Gol'Bolar Quarry."),
             },
         },
         cave = {

@@ -107,9 +107,11 @@ local function ExtendZoomLevels(sc)
             layerIndex = lastLevel.layerIndex,
         }
     end
-    -- Scales of the first and last additional steps, for MapLabels' subzone
-    -- fade. Nil whenever no additional steps are on the ladder.
+    -- Scales of Blizzard's last step and of the first and last additional
+    -- steps, for MapLabels' zoom fades. Nil whenever no additional steps are
+    -- on the ladder.
     ZoomLevels.extra = {
+        boundary = lastLevel.scale,
         from = levels[#levels - EXTRA_STEPS + 1].scale,
         to = levels[#levels].scale,
     }

@@ -183,6 +183,12 @@ Config.DEFAULTS = {
     townLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
     subzoneLabelTrueBorder = true,
     subzoneLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
+    -- Fade when zoomed, per type: capital and town labels fade out as the map
+    -- is zoomed in, subzone labels fade in over the additional zoom levels.
+    -- Off, the label shows at every zoom. See MapLabels.lua.
+    capitalLabelZoomFade = true,
+    townLabelZoomFade = true,
+    subzoneLabelZoomFade = true,
     -- "Show on SD" (Options): labels stay fully visible across the whole HD/SD
     -- blend, not just its HD half. See MapLabels' LabelAlpha.
     labelShowOnSD = false,

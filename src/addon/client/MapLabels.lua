@@ -215,9 +215,38 @@ local function LabelAlpha()
     return math.max(0, math.min(1, (Config:GetAlpha() - 0.5) * 2))
 end
 
+--- How far the canvas is zoomed in: 0 at the loosest step, 0.5 at Blizzard's
+--- own tightest one. The additional zoom levels are the other half (0.5 to 1),
+--- where only subzone labels show. 0 when the ladder has no range.
+local function ZoomProgress()
+    local sc = WorldMapFrame.ScrollContainer
+    local levels = sc and sc.zoomLevels
+    local base = levels and levels[1] and levels[1].scale
+    local extra = ns.ZoomLevels.extra
+    local top = extra and extra.boundary
+        or (levels and levels[#levels] and levels[#levels].scale)
+    local cur = sc and sc.currentScale
+    if not (base and top and cur) or top <= base then return 0 end
+    return 0.5 * math.max(0, math.min(1, (cur - base) / (top - base)))
+end
+
+-- Zoom progress at which a kind starts and finishes fading out, when its Fade
+-- when zoomed option is on.
+local FADE_OUT = { capital = { 0.10, 0.20 }, town = { 0.20, 0.50 } }
+
+--- Opacity from zoom for a capital or town label; 1 for any other kind, or
+--- with the kind's Fade when zoomed off.
+local function ZoomFade(kind, progress)
+    local band = FADE_OUT[kind]
+    if not band or not Config.db[KIND[kind].color .. "ZoomFade"] then return 1 end
+    return 1 - math.max(0, math.min(1, (progress - band[1]) / (band[2] - band[1])))
+end
+
 --- Opacity of subzone labels: 0 at the first additional zoom level, rising
 --- linearly to 1 at the tightest one. 0 when there are no additional levels.
+--- Always 1 with their Fade when zoomed off.
 local function SubzoneAlpha()
+    if not Config.db.subzoneLabelZoomFade then return 1 end
     local extra = ns.ZoomLevels.extra
     local sc = WorldMapFrame.ScrollContainer
     local cur = sc and sc.currentScale
@@ -271,6 +300,7 @@ function MapLabels:Refresh()
     frame:SetAlpha(LabelAlpha())
 
     local subzoneAlpha = SubzoneAlpha()
+    local progress = ZoomProgress()
     local w, h = canvas:GetSize()
     for i, label in ipairs(labels) do
         local l = labelFrames[i]
@@ -279,7 +309,8 @@ function MapLabels:Refresh()
             labelFrames[i] = l
         end
         Paint(l, label, label.u * w, -label.v * h, LabelScale(label.kind))
-        l.holder:SetAlpha(label.kind == "subzone" and subzoneAlpha or 1)
+        l.holder:SetAlpha(label.kind == "subzone" and subzoneAlpha
+            or ZoomFade(label.kind, progress))
     end
     for i = #labels + 1, #labelFrames do
         labelFrames[i].holder:Hide()
