@@ -34,6 +34,8 @@ A slider on the side can be adjusted to change the slice of cave depth you are c
 
 An optional **Other indoors** toggle extends the same window to buildings, houses and every other indoor area.
 
+Ironforge and Undercity always open their underground interior map from inside the city, whether or not **Other indoors** is on, as long as the cave map is on.
+
 The **Instance map (beta)** section's **Dungeon** and **Raid** toggles control the window inside dungeon and raid instances, independently of the cave map toggle. Both are off by default; with one off, nothing extra shows inside that kind of instance.
 
 ## Area Labels
