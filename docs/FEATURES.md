@@ -39,9 +39,7 @@ The **Instance map (beta)** section's **Dungeon** and **Raid** toggles control t
 ## Area Labels
 
 Area names optionally drawn over the map, in four zoom levels, each with its own configurable settings.
+Also supports fog of war exploration. Explore and unlock labelled areas of your map as you progress.
 
 ![Area Labels](https://i.postimg.cc/90pqTN40/area-labels-gif.gif)
-
-Know exactly where you are, right down the the subzone level
-
 
