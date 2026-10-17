@@ -133,20 +133,25 @@ local function LabelSection(order, title, k, desc)
                     ns.MapLabels:Refresh()
                 end,
             },
-            autoScale = {
+            autoScale = k.auto and {
                 order = 15,
                 type = "toggle",
                 name = "Auto-scale",
                 desc = "Grows these labels as you zoom out and shrinks them "
                     .. "as you zoom in, starting from the label scale at the "
                     .. "loosest zoom.",
-                hidden = function() return not k.auto end,
                 disabled = function() return not Config.db[showKey] end,
                 get = function() return Config.db[autoKey] end,
                 set = function(_, value)
                     Config.db[autoKey] = value
                     ns.MapLabels:Refresh()
                 end,
+            } or {
+                -- No Auto-scale for this kind: an empty cell holds its place in the row.
+                order = 15,
+                type = "description",
+                width = 1,
+                name = "",
             },
             zoomFade = {
                 order = 35,
