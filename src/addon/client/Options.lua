@@ -5,9 +5,8 @@
 -- Background plus a per-map-type override each for Zone/Continent/World),
 -- the cave map section, and a profiles tab (AceDBOptions-3.0).
 --
--- AceConfigDialog handles the rest: drawing the client's Interface Options
--- page (registered by RegisterClientPanel below) and the standalone window
--- /hfwm options opens, across every client flavour this addon supports.
+-- AceConfigDialog draws the client's Interface Options pages (registered by
+-- RegisterClientPanel below), across every client flavour this addon supports.
 -------------------------------------------------------------------------------
 local addonName, ns = ...
 local Options = ns.Options
@@ -44,6 +43,237 @@ local function MapTypeBackgroundValues()
         values[bg.key] = bg.label
     end
     return values
+end
+
+--- True when every Area Labels group is off, which greys out the other label
+--- settings.
+local function NoAreaLabelsOn()
+    return not (Config.db.showAreaContinentNames or Config.db.showAreaCapitalCities
+        or Config.db.showAreaTownsHubs or Config.db.showAreaSubzoneNames)
+end
+
+local SECTION_RESET = "HFWM-SectionReset"  -- registered below, with the widgets
+-- The Config.db fields of each label kind: the show toggle, scale, Auto-scale
+-- and the prefix of its <color>ColorMode / Color / Color2 / GradientDir /
+-- Outline fields.
+local AREA_LABEL_KINDS = {
+    continent = { show = "showAreaContinentNames", scale = "continentAreaLabelScale",
+                  auto = "continentAutoScale", color = "continentAreaLabel" },
+    capital   = { show = "showAreaCapitalCities", scale = "capitalAreaLabelScale",
+                  auto = "capitalAutoScale", color = "capitalAreaLabel",
+                  fade = "Fades these labels out as you zoom in: capital at "
+                      .. "60% one step in, gone at the next. Town and hub at "
+                      .. "60% two steps further in, gone one step after that. "
+                      .. "Off, they stay visible." },
+    town      = { show = "showAreaTownsHubs", scale = "townAreaLabelScale",
+                  auto = "townAutoScale", color = "townAreaLabel",
+                  fade = "Fades these labels out as you zoom in: town and hub "
+                      .. "start at the second step, 60% at the third, gone at "
+                      .. "the fourth. Off, they stay visible." },
+    subzone   = { show = "showAreaSubzoneNames", scale = "subzoneAreaLabelScale",
+                  color = "subzoneAreaLabel",
+                  fade = "Fades these labels in over the additional zoom "
+                      .. "levels, starting at the first one (50% of the zoom "
+                      .. "range). Off, they show at every zoom. Needs "
+                      .. "Additional zoom levels on." },
+}
+
+--- Every Config.db field of one label kind, for Reset to defaults.
+local function AreaLabelKeys(k)
+    local keys = { k.show, k.scale }
+    if k.auto then keys[#keys + 1] = k.auto end
+    for _, suffix in ipairs({ "ColorMode", "Color", "Color2", "GradientDir", "Outline" }) do
+        keys[#keys + 1] = k.color .. suffix
+    end
+    if k.fade then keys[#keys + 1] = k.color .. "ZoomFade" end
+    return keys
+end
+
+-- What the Area Labels page's Reset to Defaults restores.
+local AREA_LABEL_PAGE_KEYS = { "areaLabelScale", "areaLabelShowOnSD" }
+for _, k in pairs(AREA_LABEL_KINDS) do
+    for _, key in ipairs(AreaLabelKeys(k)) do AREA_LABEL_PAGE_KEYS[#AREA_LABEL_PAGE_KEYS + 1] = key end
+end
+
+--- Is any of *keys* in Config.db different from its default? Colours are
+--- {r, g, b} tables, so those compare element by element.
+local function DiffersFromDefaults(keys)
+    for _, key in ipairs(keys) do
+        local v, d = Config.db[key], Config.DEFAULTS[key]
+        if type(d) == "table" then
+            for i = 1, #d do
+                if v[i] ~= d[i] then return true end
+            end
+        elseif v ~= d then
+            return true
+        end
+    end
+    return false
+end
+
+--- An Area Labels section, boxed like Map Background: an Enabled toggle for one
+--- label kind (*k*, from AREA_LABEL_KINDS), its own Auto-scale, Label scale,
+--- colours and a Reset to defaults.
+local function AreaLabelSection(order, title, k, desc)
+    local showKey, scaleKey, autoKey, colorKey = k.show, k.scale, k.auto, k.color
+    return {
+        order = order,
+        type = "group",
+        inline = true,
+        name = title,
+        args = {
+            enabled = {
+                order = 10,
+                type = "toggle",
+                name = "Enabled",
+                desc = desc,
+                get = function() return Config.db[showKey] end,
+                set = function(_, value)
+                    Config.db[showKey] = value
+                    ns.AreaLabels:Refresh()
+                end,
+            },
+            autoScale = k.auto and {
+                order = 15,
+                type = "toggle",
+                name = "Auto-scale",
+                desc = "Grows these labels as you zoom out and shrinks them "
+                    .. "as you zoom in, starting from the label scale at the "
+                    .. "loosest zoom.",
+                disabled = function() return not Config.db[showKey] end,
+                get = function() return Config.db[autoKey] end,
+                set = function(_, value)
+                    Config.db[autoKey] = value
+                    ns.AreaLabels:Refresh()
+                end,
+            } or {
+                -- No Auto-scale for this kind: an empty cell holds its place in the row.
+                order = 15,
+                type = "description",
+                width = 1,
+                name = "",
+            },
+            zoomFade = {
+                order = 35,
+                width = "full",
+                type = "toggle",
+                name = "Fade when zoomed",
+                desc = k.fade,
+                hidden = function() return not k.fade end,
+                disabled = function() return not Config.db[showKey] end,
+                get = function() return Config.db[colorKey .. "ZoomFade"] end,
+                set = function(_, value)
+                    Config.db[colorKey .. "ZoomFade"] = value
+                    ns.AreaLabels:Refresh()
+                end,
+            },
+            scale = {
+                order = 20,
+                type = "range",
+                name = "Label scale",
+                desc = "Size of these labels, as a multiple of their default "
+                    .. "size. Applies on top of the Global label scale.",
+                min = 0.5, max = 2, step = 0.05, isPercent = true,
+                disabled = function() return not Config.db[showKey] end,
+                get = function() return Config.db[scaleKey] / Config.DEFAULTS[scaleKey] end,
+                set = function(_, value)
+                    Config.db[scaleKey] = value * Config.DEFAULTS[scaleKey]
+                    ns.AreaLabels:Refresh()
+                end,
+            },
+            colorMode = {
+                order = 30,
+                type = "select",
+                name = "Colour",
+                values = { solid = "Solid", gradient = "Gradient" },
+                sorting = { "solid", "gradient" },
+                disabled = function() return not Config.db[showKey] end,
+                get = function() return Config.db[colorKey .. "ColorMode"] end,
+                set = function(_, value)
+                    Config.db[colorKey .. "ColorMode"] = value
+                    ns.AreaLabels:Refresh()
+                end,
+            },
+            color = {
+                order = 31,
+                width = 0.5,
+                type = "color",
+                name = function()
+                    return Config.db[colorKey .. "ColorMode"] == "gradient"
+                        and "#1" or "Colour"
+                end,
+                disabled = function() return not Config.db[showKey] end,
+                get = function() return unpack(Config.db[colorKey .. "Color"]) end,
+                set = function(_, r, g, b)
+                    Config.db[colorKey .. "Color"] = { r, g, b }
+                    ns.AreaLabels:Refresh()
+                end,
+            },
+            color2 = {
+                order = 32,
+                width = 0.5,
+                type = "color",
+                name = "#2",
+                hidden = function()
+                    return Config.db[colorKey .. "ColorMode"] ~= "gradient"
+                end,
+                disabled = function() return not Config.db[showKey] end,
+                get = function() return unpack(Config.db[colorKey .. "Color2"]) end,
+                set = function(_, r, g, b)
+                    Config.db[colorKey .. "Color2"] = { r, g, b }
+                    ns.AreaLabels:Refresh()
+                end,
+            },
+            outline = {
+                order = 33,
+                width = 0.5,
+                type = "color",
+                name = "Outline",
+                desc = "Colour of the outline around these labels.",
+                disabled = function() return not Config.db[showKey] end,
+                get = function() return unpack(Config.db[colorKey .. "Outline"]) end,
+                set = function(_, r, g, b)
+                    Config.db[colorKey .. "Outline"] = { r, g, b }
+                    ns.AreaLabels:Refresh()
+                end,
+            },
+            gradientDir = {
+                order = 34,
+                type = "select",
+                name = "Gradient direction",
+                values = { HORIZONTAL = "Left to right",
+                           VERTICAL = "Top to bottom" },
+                sorting = { "HORIZONTAL", "VERTICAL" },
+                hidden = function()
+                    return Config.db[colorKey .. "ColorMode"] ~= "gradient"
+                end,
+                disabled = function() return not Config.db[showKey] end,
+                get = function() return Config.db[colorKey .. "GradientDir"] end,
+                set = function(_, value)
+                    Config.db[colorKey .. "GradientDir"] = value
+                    ns.AreaLabels:Refresh()
+                end,
+            },
+            reset = {
+                order = 1,
+                hidden = function() return not DiffersFromDefaults(AreaLabelKeys(k)) end,
+                type = "execute",
+                dialogControl = SECTION_RESET,
+                name = "Reset to defaults",
+                confirm = true,
+                confirmText = "Reset the " .. title .. " label settings to "
+                    .. "their defaults?",
+                func = function()
+                    for _, key in ipairs(AreaLabelKeys(k)) do
+                        Config.db[key] = Config.DEFAULTS[key]
+                    end
+                    ns.AreaLabels:Refresh()
+                    GameTooltip:Hide()  -- the button is about to vanish; no OnLeave
+                    ns.Options:Refresh()
+                end,
+            },
+        },
+    }
 end
 
 --- Fog of War only works over Blizzard's own art, which only Hybrid leaves
@@ -184,23 +414,85 @@ do
         return checkbox
     end, 1)
 end
+
+--- "Reset to defaults" button for an Area Labels section, pinned to the top-right
+--- of its box. AceConfigDialog flows every widget into the group's content,
+--- so this one takes a 1x1 slot there (the widget's frame is that empty
+--- holder) and the real button is anchored to the group's own frame instead.
+do
+    local AceGUI = LibStub("AceGUI-3.0")
+    AceGUI:RegisterWidgetType(SECTION_RESET, function()
+        local widget = AceGUI.WidgetRegistry.Button()
+        widget.type = SECTION_RESET  -- own pool, not Button's
+        local button = widget.frame
+        local holder = CreateFrame("Frame", nil, UIParent)
+        holder:Hide()
+        holder:SetSize(1, 1)
+        holder.obj = widget
+        widget.frame = holder
+        button:SetParent(holder)
+        button:SetSize(22, 22)
+        button:Show()  -- the stock Button constructor hides it; the holder now gates visibility
+        widget.text:Hide()
+        local icon = button:CreateTexture(nil, "ARTWORK")
+        icon:SetTexture("Interface\\Buttons\\UI-RefreshButton")
+        icon:SetSize(16, 16)
+        icon:SetPoint("CENTER")
+        -- The option's name is the tooltip, not button text.
+        -- SetScript, not HookScript: the stock OnEnter fires the widget's
+        -- OnEnter, which makes AceConfigDialog show a second tooltip.
+        button:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT")
+            GameTooltip:SetText(widget.tip or "", 1, 1, 1)
+        end)
+        button:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+        local setParent, onAcquire = widget.SetParent, widget.OnAcquire
+        function widget:OnAcquire()
+            onAcquire(self)
+            holder:SetSize(1, 1)
+        end
+        function widget:SetParent(parent)
+            setParent(self, parent)
+            button:ClearAllPoints()
+            button:SetPoint("TOPRIGHT", parent.frame, "TOPRIGHT", -4, 0)
+        end
+        function widget:SetText(text) self.tip = text end
+        function widget:SetDisabled(disabled)
+            self.disabled = disabled
+            button:SetEnabled(not disabled)
+            icon:SetDesaturated(disabled)
+        end
+        function widget:SetWidth() end
+        function widget:SetHeight() end
+        return widget
+    end, 1)
+end
 -- Same StaticPopup pattern as HFWM_ART_URL above: confirmation before a
 -- destructive action. ResetProfile resets the current profile in place and
 -- fires OnProfileReset (-> Config:RefreshProfile); the rest is state that
 -- RefreshProfile doesn't cover. mapFade is a game CVar, not in the profile.
-StaticPopupDialogs["HFWM_RESET_SETTINGS"] = {
-    text = "Reset all High Fidelity World Map settings to their defaults?\n"
-        .. "Any unsaved changes will be lost.",
+local function RefreshAfterReset()
+    ns.ToggleButton:Refresh()
+    ns.Coords:Refresh()
+    ns.KeepCentered:Refresh()
+    ns.CaveRenderer:ApplyAlpha()
+    ns.CaveRenderer:Relayout()
+end
+-- Restores just one page's `keys` (see MAIN_PAGE/SUB_PAGES), passed in as the
+-- popup's data.
+StaticPopupDialogs["HFWM_RESET_PAGE"] = {
+    text = "Reset the %s settings to their defaults?\n"
+        .. "Settings on other pages are left alone.",
     button1 = ACCEPT,
     button2 = CANCEL,
-    OnAccept = function()
-        _G.SetCVar("mapFade", "1")
-        Config.dbObj:ResetProfile()
-        ns.ToggleButton:Refresh()
-        ns.Coords:Refresh()
-        ns.KeepCentered:Refresh()
-        ns.CaveRenderer:ApplyAlpha()
-        ns.CaveRenderer:Relayout()
+    OnAccept = function(_, page)
+        for _, key in ipairs(page.keys) do
+            Config.db[key] = Config.DEFAULTS[key]
+        end
+        if page.onReset then page.onReset() end
+        Config:RefreshProfile()
+        RefreshAfterReset()
     end,
     timeout = 0,
     whileDead = true,
@@ -229,6 +521,7 @@ local options = {
                 ns.Renderer:ForceRefresh()
                 ns.ToggleButton:Refresh()
                 ns.Coords:Refresh()
+                ns.AreaLabels:Refresh()
             end,
         },
         rememberMapZoomPan = {
@@ -344,8 +637,8 @@ local options = {
             type = "group",
             inline = true,
             -- Boxed section, same treatment as Cave map just below it --
-            -- not a tab under Profiles' tree, and placed directly above
-            -- Cave map since it matters more.
+            -- not a tab under Profiles' tree, and placed above Cave map since
+            -- it matters more.
             name = "Map Background",
             args = {
                 globalBackground = {
@@ -363,6 +656,61 @@ local options = {
                 -- Zone/World/Continent Map dropdowns, stacked below Global
                 -- Background, filled in just after this table from
                 -- Config.MAP_TYPES.
+            },
+        },
+        areaLabels = {
+            order = 76,
+            type = "group",
+            inline = true,
+            name = "Area Labels",
+            args = {
+                areaLabelScale = {
+                    order = 10,
+                    type = "range",
+                    name = "Global label scale",
+                    desc = "Size of every map label, as a multiple of its "
+                        .. "default size. Multiplies each section's own "
+                        .. "Label scale.",
+                    min = 0.5, max = 2, step = 0.05, isPercent = true,
+                    disabled = NoAreaLabelsOn,
+                    -- Stored as a multiple of the base size; shown halved so
+                    -- the default (2) reads as 100%.
+                    get = function() return Config.db.areaLabelScale / 2 end,
+                    set = function(_, value)
+                        Config.db.areaLabelScale = value * 2
+                        ns.AreaLabels:Refresh()
+                    end,
+                },
+                areaLabelShowOnSD = {
+                    order = 11,
+                    type = "toggle",
+                    name = "Show on SD",
+                    desc = "Keeps the labels fully visible on SD maps, "
+                        .. "not just HD. Off, they fade in as the HD/SD "
+                        .. "slider passes 50%.",
+                    disabled = NoAreaLabelsOn,
+                    get = function() return Config.db.areaLabelShowOnSD end,
+                    set = function(_, value)
+                        Config.db.areaLabelShowOnSD = value
+                        ns.AreaLabels:Refresh()
+                    end,
+                },
+                continentAreaLabels = AreaLabelSection(20, "Continents",
+                    AREA_LABEL_KINDS.continent,
+                    "Shows the names of continents, such as Eastern "
+                        .. "Kingdoms, on their continent maps."),
+                capitalAreaLabels = AreaLabelSection(21, "Capital Cities",
+                    AREA_LABEL_KINDS.capital,
+                    "Shows the names of capital cities, such as "
+                        .. "Stormwind and Ironforge."),
+                townAreaLabels = AreaLabelSection(22, "Towns/Hubs",
+                    AREA_LABEL_KINDS.town,
+                    "Shows the names of towns and hubs, such as "
+                        .. "Goldshire and Northshire."),
+                subzoneAreaLabels = AreaLabelSection(23, "Subzones",
+                    AREA_LABEL_KINDS.subzone,
+                    "Shows the names of outdoor areas inside a zone, such as "
+                        .. "Gol'Bolar Quarry."),
             },
         },
         cave = {
@@ -668,6 +1016,46 @@ for key, option in pairs(options.args) do
         option.disabled = function() return not Config.db.enabled end
     end
 end
+
+-- The client's Settings panel splits this up: the main page keeps the
+-- general settings, and Labels, Cave Map, Instance Map and Profiles
+-- each get their own sub page under it (registered in Init). All of them
+-- share the same arg tables, so the disabled rules above apply everywhere.
+--
+-- `keys` are the Config.db fields a page's Reset to Defaults restores (a
+-- key with no DEFAULTS entry, like toggleButtonPoint, is cleared). Profiles
+-- has none: it has its own reset.
+local MAIN_APP = addonName .. "_Main"
+local MAIN_PAGE = {
+    title = PANEL_TITLE,
+    keys = {
+        "enabled", "rememberMapZoomPan", "additionalZoomLevels",
+        "keepCentered", "showPlayerCoords", "showMouseCoords",
+        "toggleButtonEnabled", "toggleButtonMovable", "toggleButtonPoint",
+        "mapBackground", "zoneMapBackground", "continentMapBackground",
+        "worldMapBackground", "worldMapClarity", "continentMapClarity",
+        "fogOfWarEnabled", "worldFogOfWar", "continentFogOfWar",
+    },
+    -- mapFade is a game CVar, not a profile field.
+    onReset = function() _G.SetCVar("mapFade", "1") end,
+}
+local SUB_PAGES = {
+    { key = "areaLabels", title = "Area Labels",
+      keys = AREA_LABEL_PAGE_KEYS },
+    { key = "cave", title = "Cave Map",
+      keys = { "caveEnabled", "caveAutoOpen", "caveRememberState",
+               "caveKeepOpen", "cavePlacement", "caveOtherIndoors",
+               "caveAlpha", "caveWindowScale", "caveWindowPoint" } },
+    { key = "instance", title = "Instance Map (beta)",
+      keys = { "instanceDungeonEnabled", "instanceRaidEnabled" } },
+    { key = "profiles", title = "Profiles" },
+}
+for _, page in ipairs(SUB_PAGES) do page.app = addonName .. "_" .. page.key end
+local mainOptions = { type = "group", name = PANEL_TITLE, args = {} }
+for key, option in pairs(options.args) do
+    mainOptions.args[key] = option
+end
+for _, page in ipairs(SUB_PAGES) do mainOptions.args[page.key] = nil end
 for key, option in pairs(mapBackgroundArgs) do
     if option.disabled then
         local notHybrid = option.disabled
@@ -675,20 +1063,26 @@ for key, option in pairs(mapBackgroundArgs) do
     end
 end
 
-Options.optionsTable = options
-
 local LOGO = "Interface\\AddOns\\" .. addonName .. "\\Assets\\logo_lowres.dxt5.blp"
+
+-- The "Open/Close preview" buttons, one per page with a Reset button. Their
+-- functions are defined with the map helpers below.
+local previewButtons = {}
+local PreviewToggle, UpdatePreview
 
 --- Replace the panel's title text with the logo (512x128 source, shown at 4:1)
 --- and dock a "Reset to Defaults" button opposite it, top-right, vertically
 --- centered on the logo. Title is hidden via alpha, not cleared:
 --- AceConfigDialog re-sets its text on every redraw.
-local function ShowLogo(frame)
+--- `reset`: a page (resets just its own settings) or nil (no button, for
+--- Profiles, which has its own reset).
+local function ShowLogo(frame, reset)
     frame.obj.label:SetAlpha(0)
     local logo = frame:CreateTexture(nil, "OVERLAY")
     logo:SetTexture(LOGO)
     logo:SetSize(144, 36)
     logo:SetPoint("TOPLEFT", 10, -4)
+    if not (reset and reset.keys) then return end
 
     local button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     button:SetText("Reset to Defaults")
@@ -696,9 +1090,147 @@ local function ShowLogo(frame)
     -- -11: vertically centered on the logo (TOPLEFT -4, height 36).
     button:SetPoint("TOPRIGHT", -10, -11)
     button:SetScript("OnClick", function()
-        StaticPopup_Show("HFWM_RESET_SETTINGS")
+        StaticPopup_Show("HFWM_RESET_PAGE", reset.title, nil, reset)
+    end)
+
+    local preview = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    preview:SetSize(140, 22)
+    preview:SetPoint("TOPRIGHT", button, "TOPLEFT", -6, 0)
+    preview:SetScript("OnClick", function() PreviewToggle(frame) end)
+    previewButtons[#previewButtons + 1] = preview
+    UpdatePreview()
+end
+
+--- The world map is shown behind the HFWM settings pages, and closed again
+--- when the player leaves them. It only closes a map this shows itself, so a
+--- map the player already had open stays open. The Settings panel draws above
+--- the map's HIGH strata, so the map drops to MAP_STRATA while the pages are
+--- up and goes back to its own strata when they are left. Once the player
+--- uses Close preview, moving between pages does not reopen the map until
+--- every HFWM page has been left.
+local MAP_STRATA = "MEDIUM"
+local panelFrames = {}
+local mapShownHere = false
+local previewDismissed = false  -- Close preview used since the pages opened
+local mapStrata  -- the map's own strata, while it is lowered
+
+local function AnyPanelShown()
+    for f in pairs(panelFrames) do
+        if f:IsVisible() then return true end
+    end
+    return false
+end
+
+--- Raise the top-level frame that holds a Settings page, as clicking it does,
+--- so it draws above the map. Walks up from the page to the child of UIParent.
+local function RaiseSettings(frame)
+    local top = frame
+    while top:GetParent() and top:GetParent() ~= UIParent do
+        top = top:GetParent()
+    end
+    top:Raise()
+end
+
+--- Anchor a map the panel manager never positioned where it puts a "left"
+--- panel (UpdateUIPanelPositions): TOPLEFT of UIParent, at the layout's left
+--- offset and top offset, clamped to the screen. The map is registered with
+--- no x/y offset and a minimum y offset of 0. With the manager's helpers
+--- missing, the centre of the screen is the best that can be done.
+local function AnchorMap(map)
+    local layout, clamp = _G.GetUIPanelLayoutAttribute, _G.ClampUIPanelY
+    map:ClearAllPoints()
+    if not (layout and clamp) then
+        map:SetPoint("CENTER", UIParent, "CENTER")
+        return
+    end
+    local scale = map:GetScale()
+    local x = layout("LEFT_OFFSET")
+    local y = clamp(map, layout("TOP_OFFSET"), 0)
+    map:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x / scale, y / scale)
+end
+
+--- Open the world map behind the Settings page *frame*. ShowUIPanel is how
+--- Blizzard opens and positions the map, but it can refuse without a word
+--- while another panel is up, so fall back to Show(). A map nothing has
+--- positioned is shown yet invisible, so it is anchored (AnchorMap) when it
+--- has no anchor. The strata and the Settings raise come last, as
+--- opening the map raises it and can reset its strata.
+local function OpenMap(frame)
+    local map = _G.WorldMapFrame
+    if not mapStrata then mapStrata = map:GetFrameStrata() end
+    ShowUIPanel(map)
+    if not map:IsShown() then map:Show() end
+    if not map:IsShown() then
+        ns.P("Could not open the world map preview.")
+        return
+    end
+    if map:GetNumPoints() == 0 then AnchorMap(map) end
+    map:SetFrameStrata(MAP_STRATA)
+    RaiseSettings(frame)
+end
+
+--- Close the world map the same way: HideUIPanel, then Hide() if it stayed.
+local function CloseMap()
+    local map = _G.WorldMapFrame
+    HideUIPanel(map)
+    if map:IsShown() then map:Hide() end
+end
+
+local function PanelShown(frame)
+    panelFrames[frame] = true
+    if previewDismissed then return end
+    local opening = not _G.WorldMapFrame:IsShown()
+    OpenMap(frame)
+    if opening and _G.WorldMapFrame:IsShown() then mapShownHere = true end
+end
+
+local function PanelHidden()
+    -- Deferred: moving to another HFWM page hides this one and shows the next,
+    -- so only restore once no HFWM page is visible.
+    C_Timer.After(0, function()
+        if AnyPanelShown() then return end
+        previewDismissed = false
+        local map = _G.WorldMapFrame
+        if mapStrata then
+            map:SetFrameStrata(mapStrata)
+            mapStrata = nil
+        end
+        if mapShownHere then
+            mapShownHere = false
+            CloseMap()
+        end
     end)
 end
+
+--- Open or close the world map from a page's preview button. Opening it sits
+--- it behind the Settings page, as the automatic open does, and it stays open
+--- when the page is left.
+function PreviewToggle(frame)
+    if _G.WorldMapFrame:IsShown() then
+        previewDismissed = true
+        mapShownHere = false
+        CloseMap()
+    else
+        previewDismissed = false
+        OpenMap(frame)
+    end
+end
+
+--- Label every preview button for the map's state, and grey them out in
+--- combat.
+function UpdatePreview()
+    local shown = _G.WorldMapFrame:IsShown()
+    local inCombat = _G.InCombatLockdown()
+    for _, b in ipairs(previewButtons) do
+        b:SetText(shown and "Close preview" or "Open preview")
+        if inCombat then b:Disable() else b:Enable() end
+    end
+end
+
+local combatWatch = CreateFrame("Frame")
+combatWatch:RegisterEvent("PLAYER_REGEN_DISABLED")
+combatWatch:RegisterEvent("PLAYER_REGEN_ENABLED")
+combatWatch:SetScript("OnEvent", function() UpdatePreview() end)
 
 --- AceConfigDialog:AddToBlizOptions, minus one line: on clients without
 --- C_SettingsUtil.OpenSettingsPanel (Forever) it overwrites the Blizzard
@@ -707,70 +1239,92 @@ end
 --- (ADDON_ACTION_FORBIDDEN SetPreferredGamepadInteractTarget). Nothing here
 --- opens the panel by name, so the client's own ID is kept. The widget is
 --- still listed in AceConfigDialog.BlizOptions so NotifyChange redraws it.
---- Returns the canvas frame the first time, nil after that.
-local panelGroup
-local function RegisterClientPanel(AceConfigDialog)
-    if panelGroup then return nil end
+--- With `parentCategory` the page is registered as a sub page under it.
+--- Returns the canvas frame and the Settings category.
+local function RegisterClientPanel(AceConfigDialog, appName, title, parentCategory)
     local group = LibStub("AceGUI-3.0"):Create("BlizOptionsGroup")
-    group:SetTitle(PANEL_TITLE)
-    group:SetUserData("appName", addonName)
+    group:SetTitle(title)
+    group:SetUserData("appName", appName)
     group:SetCallback("OnShow", function(widget)
-        AceConfigDialog:Open(addonName, widget)
+        AceConfigDialog:Open(appName, widget)
+        PanelShown(widget.frame)
     end)
     group:SetCallback("OnHide", function(widget)
+        PanelHidden()
         -- Deferred: this runs inside Blizzard's Settings close chain, and addon
         -- code there taints it (blocks SetPreferredGamepadInteractTarget).
         C_Timer.After(0, function()
-            AceConfigDialog:Close(addonName)  -- the standalone window, as upstream does
             if not widget.frame:IsVisible() then widget:ReleaseChildren() end
         end)
     end)
 
-    local category = Settings.RegisterCanvasLayoutCategory(group.frame, PANEL_TITLE)
-    group:SetName(category.ID)
-    Settings.RegisterAddOnCategory(category)
+    local category
+    if parentCategory then
+        category = Settings.RegisterCanvasLayoutSubcategory(parentCategory, group.frame, title)
+        group:SetName(category.ID, parentCategory.ID)
+    else
+        category = Settings.RegisterCanvasLayoutCategory(group.frame, title)
+        group:SetName(category.ID)
+        Settings.RegisterAddOnCategory(category)
+    end
 
-    AceConfigDialog.BlizOptions[addonName] = AceConfigDialog.BlizOptions[addonName] or {}
-    AceConfigDialog.BlizOptions[addonName][addonName] = group
-    AceConfigDialog.BlizOptionsIDMap[PANEL_TITLE] = category.ID
-    panelGroup = group
-    return group.frame
+    AceConfigDialog.BlizOptions[appName] = AceConfigDialog.BlizOptions[appName] or {}
+    AceConfigDialog.BlizOptions[appName][appName] = group
+    AceConfigDialog.BlizOptionsIDMap[title] = category.ID
+    return group.frame, category
 end
 
---- Register the options table and hook it into the client's own options
+local registered
+--- Register the options tables and hook them into the client's own options
 --- UI. Safe to call more than once.
 function Options:Init()
     if not options.args.profiles then
-        options.args.profiles = LibStub("AceDBOptions-3.0"):GetOptionsTable(
+        local profiles = LibStub("AceDBOptions-3.0"):GetOptionsTable(
             Config.dbObj)
-        options.args.profiles.order = 100
+        profiles.order = 100
         -- Inline: with no tab/tree child groups AceConfigDialog wraps the
         -- whole page in one ScrollFrame, instead of squeezing a tree
         -- under the settings above.
-        options.args.profiles.inline = true
+        profiles.inline = true
+        options.args.profiles = profiles
     end
 
-    LibStub("AceConfigRegistry-3.0"):RegisterOptionsTable(addonName, options)
+    local registry = LibStub("AceConfigRegistry-3.0")
+    registry:RegisterOptionsTable(MAIN_APP, mainOptions)
+    for _, page in ipairs(SUB_PAGES) do
+        local src = options.args[page.key]
+        -- The page itself is the section's group, so it isn't boxed twice.
+        registry:RegisterOptionsTable(page.app, {
+            type = "group", name = page.title, disabled = src.disabled,
+            handler = src.handler, args = src.args,
+        })
+    end
 
     local AceConfigDialog = LibStub("AceConfigDialog-3.0")
-    -- Standalone window only; the client's options panel sets its own size.
-    AceConfigDialog:SetDefaultSize(addonName, 700, 650)
-    local ok, blizFrame = pcall(RegisterClientPanel, AceConfigDialog)
+    if registered then return end
+    -- Keep the preview labels in step with the map, however it was closed.
+    _G.WorldMapFrame:HookScript("OnShow", UpdatePreview)
+    _G.WorldMapFrame:HookScript("OnHide", UpdatePreview)
+    local frames = {}
+    local ok, err = pcall(function()
+        local frame, category = RegisterClientPanel(
+            AceConfigDialog, MAIN_APP, PANEL_TITLE)
+        frames[#frames + 1] = { frame, MAIN_PAGE }
+        for _, page in ipairs(SUB_PAGES) do
+            frame = RegisterClientPanel(
+                AceConfigDialog, page.app, page.title, category)
+            frames[#frames + 1] = { frame, page }
+        end
+    end)
+    registered = ok
     self.clientRegistered = ok
-    if ok and blizFrame then ShowLogo(blizFrame) end
-end
---- Open the options, wherever they ended up living. The standalone window
---- gets the same logo + Reset to Defaults treatment as the client's own
---- options panel.
-function Options:Open()
-    local AceConfigDialog = LibStub("AceConfigDialog-3.0")
-    AceConfigDialog:Open(addonName)
-    local frame = AceConfigDialog.OpenFrames[addonName]
-    if frame then ShowLogo(frame) end
+    for _, f in ipairs(frames) do ShowLogo(f[1], f[2]) end
 end
 
 --- Push a live setting change (from a slash command, say) out to any open
 --- options window. Safe to call whether or not one is open.
 function Options:Refresh()
-    LibStub("AceConfigRegistry-3.0"):NotifyChange(addonName)
+    local registry = LibStub("AceConfigRegistry-3.0")
+    registry:NotifyChange(MAIN_APP)
+    for _, page in ipairs(SUB_PAGES) do registry:NotifyChange(page.app) end
 end

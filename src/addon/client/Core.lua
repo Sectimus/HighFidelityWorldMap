@@ -5,7 +5,6 @@
 -- /hfwm             - toggle on / off
 -- /hfwm on|off      - explicit enable / disable
 -- /hfwm bg NAME     - map background: default | ocean | hybrid
--- /hfwm options     - open the options panel
 -- /hfwm cave        - the cave map window (on|off|show|hide|reset|alpha N|indoors)
 -- /hfwm remember    - remember world map zoom+pan across close/reopen
 -- /hfwm zoom        - additional (closer) world map zoom levels
@@ -28,6 +27,7 @@ local ResetView     = ns.ResetView
 local KeepCentered  = ns.KeepCentered
 local ToggleButton  = ns.ToggleButton
 local Coords       = ns.Coords
+local AreaLabels    = ns.AreaLabels
 local P              = ns.P
 
 -- Key Bindings entry for the cave window toggle (Bindings.xml); the same
@@ -65,6 +65,7 @@ function addon:OnEnable()
         Config.lastMapID = nil
         Renderer:Refresh(true)
         Cave:UpdateState()
+        AreaLabels:Refresh()
     end)
 
     if MapCanvasDetailLayerMixin
@@ -81,6 +82,7 @@ function addon:OnEnable()
         Config.lastMapID = nil
         Renderer:Refresh(true)
         Cave:UpdateState()
+        AreaLabels:Refresh()
     end)
     WorldMapFrame:HookScript("OnHide", function()
         CaveRenderer:SetMapOpen(false)
@@ -153,6 +155,7 @@ function addon:OnEnable()
     Cave:Start()
     MapMemory:Start()
     ZoomLevels:Start()
+    AreaLabels:Start()
     KeepCentered:Start()
     ResetView:Start()
     ToggleButton:Start()
@@ -162,7 +165,7 @@ function addon:OnEnable()
     -- After Commands, so a Lua error while probing the client's options
     -- APIs still leaves the slash commands working.
     Options:Init()
-    P("Loaded. /hfwm to toggle, /hfwm options for settings.")
+    P("Loaded. /hfwm to toggle; settings are in Esc > Options > AddOns.")
 end
 
 --- Warm the texture cache for the player's zone (Renderer:Preload), on
@@ -186,5 +189,6 @@ function addon:MAP_EXPLORATION_UPDATED()
             or Config:WorldFogOfWarEnabled(WorldMapFrame:GetMapID())) then
             Renderer:Refresh(true)
         end
+        AreaLabels:Refresh()
     end)
 end

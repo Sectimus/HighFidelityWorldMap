@@ -260,9 +260,6 @@ function Commands:Handle(msg)
             end
         end
         return
-    elseif cmd == "options" or cmd == "config" or cmd == "settings" then
-        ns.Options:Open()
-        return
     elseif cmd == "baseart" then
         -- Blizzard's own detail layer: the parchment, the sea labels and the
         -- compass rose. Every background but Hybrid hides it, and only
@@ -497,7 +494,6 @@ function Commands:Handle(msg)
         print("|cff33ccffHigh Fidelity World Map|r commands:")
         print("  /hfwm               - toggle overlay")
         print("  /hfwm on|off        - enable / disable")
-        print("  /hfwm options       - open the options panel")
         local keys = {}
         for _, bg in ipairs(Config:AvailableBackgrounds()) do
             keys[#keys + 1] = bg.key
@@ -535,6 +531,7 @@ function Commands:Handle(msg)
     end
     ns.Renderer:ForceRefresh()
     ns.ToggleButton:Refresh()
+    ns.AreaLabels:Refresh()
 end
 
 function Commands:Debug()

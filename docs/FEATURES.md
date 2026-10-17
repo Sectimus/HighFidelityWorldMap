@@ -35,3 +35,11 @@ A slider on the side can be adjusted to change the slice of cave depth you are c
 An optional **Other indoors** toggle extends the same window to buildings, houses and every other indoor area.
 
 The **Instance map (beta)** section's **Dungeon** and **Raid** toggles control the window inside dungeon and raid instances, independently of the cave map toggle. Both are off by default; with one off, nothing extra shows inside that kind of instance.
+
+## Area Labels
+
+Area names optionally drawn over the map, in four zoom levels, each with its own configurable settings.
+Also supports fog of war exploration. Explore and unlock labelled areas of your map as you progress.
+
+![Area Labels](https://i.postimg.cc/90pqTN40/area-labels-gif.gif)
+

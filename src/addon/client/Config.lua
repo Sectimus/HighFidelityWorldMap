@@ -129,6 +129,64 @@ Config.DEFAULTS = {
     -- client draws them; off hides that readout.
     showPlayerCoords = true,
     showMouseCoords  = true,
+
+    -- Area Labels (AreaLabels.lua): names drawn on the map over its art, in four
+    -- groups: continent names, capital cities, towns and hubs, and subzones.
+    showAreaContinentNames = false,
+    showAreaCapitalCities = true,
+    showAreaTownsHubs = true,
+    showAreaSubzoneNames = true,
+    -- Global label scale: multiplier (1..4) on every label. Options shows it
+    -- halved, so the default 2 reads as 100%. Multiplies each type's own
+    -- scale below. See AreaLabels.lua's AreaLabelScale.
+    areaLabelScale = 2,
+    -- Per-type label scales, each on top of areaLabelScale. Stored as the actual
+    -- multiplier; the Options sliders show each as a percent of its default.
+    continentAreaLabelScale = 1,
+    capitalAreaLabelScale = 1.15,
+    townAreaLabelScale = 1.3,
+    subzoneAreaLabelScale = 0.18,
+    -- Auto-scale per label type: labels grow as you zoom out and shrink as you
+    -- zoom in, from their label scale at the loosest zoom step. See
+    -- AreaLabels.lua's AreaLabelScale.
+    continentAutoScale = false,
+    capitalAutoScale = false,
+    townAutoScale = false,
+    -- Per-type label colour: Mode is "solid" (Color) or "gradient" (Color to
+    -- Color2, along GradientDir: "HORIZONTAL" left to right, "VERTICAL" top
+    -- to bottom). {r, g, b} 0..1. The default Color is the gold the labels
+    -- are drawn in. See AreaLabels.lua's Paint.
+    continentAreaLabelColorMode = "gradient",
+    continentAreaLabelColor = { 252 / 255, 230 / 255, 120 / 255 },
+    continentAreaLabelColor2 = { 1, 200 / 255, 90 / 255 },
+    continentAreaLabelGradientDir = "VERTICAL",
+    capitalAreaLabelColorMode = "gradient",
+    capitalAreaLabelColor = { 252 / 255, 230 / 255, 120 / 255 },
+    capitalAreaLabelColor2 = { 1, 200 / 255, 90 / 255 },
+    capitalAreaLabelGradientDir = "VERTICAL",
+    townAreaLabelColorMode = "solid",
+    townAreaLabelColor = { 1, 247 / 255, 227 / 255 },
+    townAreaLabelColor2 = { 1, 200 / 255, 90 / 255 },
+    townAreaLabelGradientDir = "VERTICAL",
+    subzoneAreaLabelColorMode = "solid",
+    subzoneAreaLabelColor = { 1, 247 / 255, 227 / 255 },
+    subzoneAreaLabelColor2 = { 1, 200 / 255, 90 / 255 },
+    subzoneAreaLabelGradientDir = "VERTICAL",
+    -- Border per type: copies of the text in the Outline colour, BORDER_RATIO of
+    -- the font size out (see AreaLabels.lua's Paint).
+    continentAreaLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
+    capitalAreaLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
+    townAreaLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
+    subzoneAreaLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
+    -- Fade when zoomed, per type: capital and town labels fade out as the map
+    -- is zoomed in, subzone labels fade in over the additional zoom levels.
+    -- Off, the label shows at every zoom. See AreaLabels.lua.
+    capitalAreaLabelZoomFade = true,
+    townAreaLabelZoomFade = true,
+    subzoneAreaLabelZoomFade = true,
+    -- "Show on SD" (Options): labels stay fully visible across the whole HD/SD
+    -- blend, not just its HD half. See AreaLabels' AreaLabelAlpha.
+    areaLabelShowOnSD = false,
 }
 -- The db also carries `caveWindowPoint` -- { left, top }, the window's
 -- TOPLEFT in UIParent units -- written by CaveRenderer when the window is
@@ -802,6 +860,7 @@ function Config:RefreshProfile()
     ns.ZoomLevels:Refresh()
     ns.Cave:UpdateState()
     ns.Options:Refresh()
+    ns.AreaLabels:Refresh()
 end
 
 --- Create the AceDB-3.0 database after ADDON_LOADED (see Core.lua's
