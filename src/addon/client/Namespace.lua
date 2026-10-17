@@ -33,7 +33,7 @@ ns.ToggleButton = {}
 ns.Integrations = {}
 ns.Coords      = {}
 ns.ZoneFog = {}
-ns.MapLabels  = {}
+ns.AreaLabels  = {}
 
 -- Convenience printer (accessible everywhere via ns.P)
 ns.P = function(msg) print("|cff33ccffHFWM-F:|r " .. msg) end

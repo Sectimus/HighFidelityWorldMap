@@ -1447,8 +1447,8 @@ function Renderer:ForceRefresh()
     Config.lastSubmerged = nil
     Config.refreshPending = false
     self:Refresh(true)
-    -- Fog of War and the backgrounds decide which labels show; see MapLabels.
-    ns.MapLabels:Refresh()
+    -- Fog of War and the backgrounds decide which labels show; see AreaLabels.
+    ns.AreaLabels:Refresh()
 end
 
 -- Offscreen-ish 1px holder for Renderer:Preload; built on first use, reused.

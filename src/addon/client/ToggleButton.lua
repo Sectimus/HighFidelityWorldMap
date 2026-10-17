@@ -82,7 +82,7 @@ local function ApplyAlpha(value)
     Config:SetAlpha(value)
     if Config.overlayFrame then Config.overlayFrame:SetAlpha(value) end
     if Config:IsMixing() ~= wasMixing then Renderer:ForceRefresh() end
-    ns.MapLabels:Refresh()
+    ns.AreaLabels:Refresh()
     UpdateLabel()
 end
 

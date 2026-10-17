@@ -38,7 +38,7 @@ data/ZoneOverlayTiles.lua
 data/ZoneShapes.lua
 data/CaveData.lua
 data/IndoorData.lua
-data/MapLabelData.lua
+data/AreaLabelData.lua
 Namespace.lua
 Config.lua
 TexturePool.lua
@@ -59,7 +59,7 @@ KeepCentered.lua
 Integrations.lua
 ToggleButton.lua
 Coords.lua
-MapLabels.lua
+AreaLabels.lua
 Commands.lua
 Options.lua
 Core.lua

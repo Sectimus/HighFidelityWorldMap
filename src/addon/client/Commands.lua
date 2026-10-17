@@ -531,7 +531,7 @@ function Commands:Handle(msg)
     end
     ns.Renderer:ForceRefresh()
     ns.ToggleButton:Refresh()
-    ns.MapLabels:Refresh()
+    ns.AreaLabels:Refresh()
 end
 
 function Commands:Debug()

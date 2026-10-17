@@ -45,33 +45,33 @@ local function MapTypeBackgroundValues()
     return values
 end
 
---- True when every Labels group is off, which greys out the other label
+--- True when every Area Labels group is off, which greys out the other label
 --- settings.
-local function NoLabelsOn()
-    return not (Config.db.showContinentNames or Config.db.showCapitalCities
-        or Config.db.showTownsHubs or Config.db.showSubzoneNames)
+local function NoAreaLabelsOn()
+    return not (Config.db.showAreaContinentNames or Config.db.showAreaCapitalCities
+        or Config.db.showAreaTownsHubs or Config.db.showAreaSubzoneNames)
 end
 
 local SECTION_RESET = "HFWM-SectionReset"  -- registered below, with the widgets
 -- The Config.db fields of each label kind: the show toggle, scale, Auto-scale
 -- and the prefix of its <color>ColorMode / Color / Color2 / GradientDir /
 -- Outline fields.
-local LABEL_KINDS = {
-    continent = { show = "showContinentNames", scale = "continentLabelScale",
-                  auto = "continentAutoScale", color = "continentLabel" },
-    capital   = { show = "showCapitalCities", scale = "capitalLabelScale",
-                  auto = "capitalAutoScale", color = "capitalLabel",
+local AREA_LABEL_KINDS = {
+    continent = { show = "showAreaContinentNames", scale = "continentAreaLabelScale",
+                  auto = "continentAutoScale", color = "continentAreaLabel" },
+    capital   = { show = "showAreaCapitalCities", scale = "capitalAreaLabelScale",
+                  auto = "capitalAutoScale", color = "capitalAreaLabel",
                   fade = "Fades these labels out as you zoom in: capital at "
                       .. "60% one step in, gone at the next. Town and hub at "
                       .. "60% two steps further in, gone one step after that. "
                       .. "Off, they stay visible." },
-    town      = { show = "showTownsHubs", scale = "townLabelScale",
-                  auto = "townAutoScale", color = "townLabel",
+    town      = { show = "showAreaTownsHubs", scale = "townAreaLabelScale",
+                  auto = "townAutoScale", color = "townAreaLabel",
                   fade = "Fades these labels out as you zoom in: town and hub "
                       .. "start at the second step, 60% at the third, gone at "
                       .. "the fourth. Off, they stay visible." },
-    subzone   = { show = "showSubzoneNames", scale = "subzoneLabelScale",
-                  color = "subzoneLabel",
+    subzone   = { show = "showAreaSubzoneNames", scale = "subzoneAreaLabelScale",
+                  color = "subzoneAreaLabel",
                   fade = "Fades these labels in over the additional zoom "
                       .. "levels, starting at the first one (50% of the zoom "
                       .. "range). Off, they show at every zoom. Needs "
@@ -79,7 +79,7 @@ local LABEL_KINDS = {
 }
 
 --- Every Config.db field of one label kind, for Reset to defaults.
-local function LabelKeys(k)
+local function AreaLabelKeys(k)
     local keys = { k.show, k.scale }
     if k.auto then keys[#keys + 1] = k.auto end
     for _, suffix in ipairs({ "ColorMode", "Color", "Color2", "GradientDir", "Outline" }) do
@@ -89,10 +89,10 @@ local function LabelKeys(k)
     return keys
 end
 
--- What the Labels page's Reset to Defaults restores.
-local LABEL_PAGE_KEYS = { "labelScale", "labelShowOnSD" }
-for _, k in pairs(LABEL_KINDS) do
-    for _, key in ipairs(LabelKeys(k)) do LABEL_PAGE_KEYS[#LABEL_PAGE_KEYS + 1] = key end
+-- What the Area Labels page's Reset to Defaults restores.
+local AREA_LABEL_PAGE_KEYS = { "areaLabelScale", "areaLabelShowOnSD" }
+for _, k in pairs(AREA_LABEL_KINDS) do
+    for _, key in ipairs(AreaLabelKeys(k)) do AREA_LABEL_PAGE_KEYS[#AREA_LABEL_PAGE_KEYS + 1] = key end
 end
 
 --- Is any of *keys* in Config.db different from its default? Colours are
@@ -111,10 +111,10 @@ local function DiffersFromDefaults(keys)
     return false
 end
 
---- A Labels section, boxed like Map Background: an Enabled toggle for one
---- label kind (*k*, from LABEL_KINDS), its own Auto-scale, Label scale,
+--- An Area Labels section, boxed like Map Background: an Enabled toggle for one
+--- label kind (*k*, from AREA_LABEL_KINDS), its own Auto-scale, Label scale,
 --- colours and a Reset to defaults.
-local function LabelSection(order, title, k, desc)
+local function AreaLabelSection(order, title, k, desc)
     local showKey, scaleKey, autoKey, colorKey = k.show, k.scale, k.auto, k.color
     return {
         order = order,
@@ -130,7 +130,7 @@ local function LabelSection(order, title, k, desc)
                 get = function() return Config.db[showKey] end,
                 set = function(_, value)
                     Config.db[showKey] = value
-                    ns.MapLabels:Refresh()
+                    ns.AreaLabels:Refresh()
                 end,
             },
             autoScale = k.auto and {
@@ -144,7 +144,7 @@ local function LabelSection(order, title, k, desc)
                 get = function() return Config.db[autoKey] end,
                 set = function(_, value)
                     Config.db[autoKey] = value
-                    ns.MapLabels:Refresh()
+                    ns.AreaLabels:Refresh()
                 end,
             } or {
                 -- No Auto-scale for this kind: an empty cell holds its place in the row.
@@ -164,7 +164,7 @@ local function LabelSection(order, title, k, desc)
                 get = function() return Config.db[colorKey .. "ZoomFade"] end,
                 set = function(_, value)
                     Config.db[colorKey .. "ZoomFade"] = value
-                    ns.MapLabels:Refresh()
+                    ns.AreaLabels:Refresh()
                 end,
             },
             scale = {
@@ -178,7 +178,7 @@ local function LabelSection(order, title, k, desc)
                 get = function() return Config.db[scaleKey] / Config.DEFAULTS[scaleKey] end,
                 set = function(_, value)
                     Config.db[scaleKey] = value * Config.DEFAULTS[scaleKey]
-                    ns.MapLabels:Refresh()
+                    ns.AreaLabels:Refresh()
                 end,
             },
             colorMode = {
@@ -191,7 +191,7 @@ local function LabelSection(order, title, k, desc)
                 get = function() return Config.db[colorKey .. "ColorMode"] end,
                 set = function(_, value)
                     Config.db[colorKey .. "ColorMode"] = value
-                    ns.MapLabels:Refresh()
+                    ns.AreaLabels:Refresh()
                 end,
             },
             color = {
@@ -206,7 +206,7 @@ local function LabelSection(order, title, k, desc)
                 get = function() return unpack(Config.db[colorKey .. "Color"]) end,
                 set = function(_, r, g, b)
                     Config.db[colorKey .. "Color"] = { r, g, b }
-                    ns.MapLabels:Refresh()
+                    ns.AreaLabels:Refresh()
                 end,
             },
             color2 = {
@@ -221,7 +221,7 @@ local function LabelSection(order, title, k, desc)
                 get = function() return unpack(Config.db[colorKey .. "Color2"]) end,
                 set = function(_, r, g, b)
                     Config.db[colorKey .. "Color2"] = { r, g, b }
-                    ns.MapLabels:Refresh()
+                    ns.AreaLabels:Refresh()
                 end,
             },
             outline = {
@@ -234,7 +234,7 @@ local function LabelSection(order, title, k, desc)
                 get = function() return unpack(Config.db[colorKey .. "Outline"]) end,
                 set = function(_, r, g, b)
                     Config.db[colorKey .. "Outline"] = { r, g, b }
-                    ns.MapLabels:Refresh()
+                    ns.AreaLabels:Refresh()
                 end,
             },
             gradientDir = {
@@ -251,12 +251,12 @@ local function LabelSection(order, title, k, desc)
                 get = function() return Config.db[colorKey .. "GradientDir"] end,
                 set = function(_, value)
                     Config.db[colorKey .. "GradientDir"] = value
-                    ns.MapLabels:Refresh()
+                    ns.AreaLabels:Refresh()
                 end,
             },
             reset = {
                 order = 1,
-                hidden = function() return not DiffersFromDefaults(LabelKeys(k)) end,
+                hidden = function() return not DiffersFromDefaults(AreaLabelKeys(k)) end,
                 type = "execute",
                 dialogControl = SECTION_RESET,
                 name = "Reset to defaults",
@@ -264,10 +264,10 @@ local function LabelSection(order, title, k, desc)
                 confirmText = "Reset the " .. title .. " label settings to "
                     .. "their defaults?",
                 func = function()
-                    for _, key in ipairs(LabelKeys(k)) do
+                    for _, key in ipairs(AreaLabelKeys(k)) do
                         Config.db[key] = Config.DEFAULTS[key]
                     end
-                    ns.MapLabels:Refresh()
+                    ns.AreaLabels:Refresh()
                     GameTooltip:Hide()  -- the button is about to vanish; no OnLeave
                     ns.Options:Refresh()
                 end,
@@ -415,7 +415,7 @@ do
     end, 1)
 end
 
---- "Reset to defaults" button for a Labels section, pinned to the top-right
+--- "Reset to defaults" button for an Area Labels section, pinned to the top-right
 --- of its box. AceConfigDialog flows every widget into the group's content,
 --- so this one takes a 1x1 slot there (the widget's frame is that empty
 --- holder) and the real button is anchored to the group's own frame instead.
@@ -521,7 +521,7 @@ local options = {
                 ns.Renderer:ForceRefresh()
                 ns.ToggleButton:Refresh()
                 ns.Coords:Refresh()
-                ns.MapLabels:Refresh()
+                ns.AreaLabels:Refresh()
             end,
         },
         rememberMapZoomPan = {
@@ -658,13 +658,13 @@ local options = {
                 -- Config.MAP_TYPES.
             },
         },
-        labels = {
+        areaLabels = {
             order = 76,
             type = "group",
             inline = true,
-            name = "Labels",
+            name = "Area Labels",
             args = {
-                labelScale = {
+                areaLabelScale = {
                     order = 10,
                     type = "range",
                     name = "Global label scale",
@@ -672,43 +672,43 @@ local options = {
                         .. "default size. Multiplies each section's own "
                         .. "Label scale.",
                     min = 0.5, max = 2, step = 0.05, isPercent = true,
-                    disabled = NoLabelsOn,
+                    disabled = NoAreaLabelsOn,
                     -- Stored as a multiple of the base size; shown halved so
                     -- the default (2) reads as 100%.
-                    get = function() return Config.db.labelScale / 2 end,
+                    get = function() return Config.db.areaLabelScale / 2 end,
                     set = function(_, value)
-                        Config.db.labelScale = value * 2
-                        ns.MapLabels:Refresh()
+                        Config.db.areaLabelScale = value * 2
+                        ns.AreaLabels:Refresh()
                     end,
                 },
-                labelShowOnSD = {
+                areaLabelShowOnSD = {
                     order = 11,
                     type = "toggle",
                     name = "Show on SD",
                     desc = "Keeps the labels fully visible on SD maps, "
                         .. "not just HD. Off, they fade in as the HD/SD "
                         .. "slider passes 50%.",
-                    disabled = NoLabelsOn,
-                    get = function() return Config.db.labelShowOnSD end,
+                    disabled = NoAreaLabelsOn,
+                    get = function() return Config.db.areaLabelShowOnSD end,
                     set = function(_, value)
-                        Config.db.labelShowOnSD = value
-                        ns.MapLabels:Refresh()
+                        Config.db.areaLabelShowOnSD = value
+                        ns.AreaLabels:Refresh()
                     end,
                 },
-                continentLabels = LabelSection(20, "Continents",
-                    LABEL_KINDS.continent,
+                continentAreaLabels = AreaLabelSection(20, "Continents",
+                    AREA_LABEL_KINDS.continent,
                     "Shows the names of continents, such as Eastern "
                         .. "Kingdoms, on their continent maps."),
-                capitalLabels = LabelSection(21, "Capital Cities",
-                    LABEL_KINDS.capital,
+                capitalAreaLabels = AreaLabelSection(21, "Capital Cities",
+                    AREA_LABEL_KINDS.capital,
                     "Shows the names of capital cities, such as "
                         .. "Stormwind and Ironforge."),
-                townLabels = LabelSection(22, "Towns/Hubs",
-                    LABEL_KINDS.town,
+                townAreaLabels = AreaLabelSection(22, "Towns/Hubs",
+                    AREA_LABEL_KINDS.town,
                     "Shows the names of towns and hubs, such as "
                         .. "Goldshire and Northshire."),
-                subzoneLabels = LabelSection(23, "Subzones",
-                    LABEL_KINDS.subzone,
+                subzoneAreaLabels = AreaLabelSection(23, "Subzones",
+                    AREA_LABEL_KINDS.subzone,
                     "Shows the names of outdoor areas inside a zone, such as "
                         .. "Gol'Bolar Quarry."),
             },
@@ -1040,8 +1040,8 @@ local MAIN_PAGE = {
     onReset = function() _G.SetCVar("mapFade", "1") end,
 }
 local SUB_PAGES = {
-    { key = "labels", title = "Labels",
-      keys = LABEL_PAGE_KEYS },
+    { key = "areaLabels", title = "Area Labels",
+      keys = AREA_LABEL_PAGE_KEYS },
     { key = "cave", title = "Cave Map",
       keys = { "caveEnabled", "caveAutoOpen", "caveRememberState",
                "caveKeepOpen", "cavePlacement", "caveOtherIndoors",

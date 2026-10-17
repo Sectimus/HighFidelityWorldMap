@@ -1,11 +1,11 @@
 -------------------------------------------------------------------------------
--- HFWM-Forever Map Labels
+-- HFWM-Forever Area Labels
 --
--- "Labels" on the world map: continent names, capital cities, towns and hubs,
--- and subzones, each group toggled from Options (Config.db.showContinentNames,
--- showCapitalCities, showTownsHubs, showSubzoneNames). The names come from
--- MapLabelData.lua, generated from the game's own DB2 tables by
--- src/generator/scripts/emit_map_labels.py.
+-- "Area Labels" on the world map: continent names, capital cities, towns and hubs,
+-- and subzones, each group toggled from Options (Config.db.showAreaContinentNames,
+-- showAreaCapitalCities, showAreaTownsHubs, showAreaSubzoneNames). The names come from
+-- AreaLabelData.lua, generated from the game's own DB2 tables by
+-- src/generator/scripts/emit_area_labels.py.
 --
 -- Each label is text drawn at runtime in Friz Quadrata TT, the game's own UI
 -- font: a gold fill with the font's own thick black outline. Labels sit on one mouse-disabled
@@ -15,27 +15,27 @@
 -------------------------------------------------------------------------------
 local addonName, ns = ...
 local Config    = ns.Config
-local MapLabels = ns.MapLabels
+local AreaLabels = ns.AreaLabels
 
 local WorldMapFrame = _G.WorldMapFrame
 
--- [uiMapID] = { { name, kind, h, u, v }, ... }, from MapLabelData.lua. name is
+-- [uiMapID] = { { name, kind, h, u, v }, ... }, from AreaLabelData.lua. name is
 -- the text shown; kind is "continent", "capital", "town" or "subzone", and
 -- picks its Options toggle through KIND below; h its height in canvas units at
 -- label scale 1; u/v the centre in 0-1 map coordinates from the top-left.
-local LABELS = HFWMF_MAP_LABELS or {}
+local AREA_LABELS = HFWMF_AREA_LABELS or {}
 
 --- Per label kind: the Options toggle that shows it, and its own scale and
 --- Auto-scale fields.
 local KIND = {
-    continent = { show = "showContinentNames", scale = "continentLabelScale",
-                  auto = "continentAutoScale", color = "continentLabel" },
-    capital   = { show = "showCapitalCities", scale = "capitalLabelScale",
-                  auto = "capitalAutoScale", color = "capitalLabel" },
-    town      = { show = "showTownsHubs", scale = "townLabelScale",
-                  auto = "townAutoScale", color = "townLabel" },
-    subzone   = { show = "showSubzoneNames", scale = "subzoneLabelScale",
-                  color = "subzoneLabel" },
+    continent = { show = "showAreaContinentNames", scale = "continentAreaLabelScale",
+                  auto = "continentAutoScale", color = "continentAreaLabel" },
+    capital   = { show = "showAreaCapitalCities", scale = "capitalAreaLabelScale",
+                  auto = "capitalAutoScale", color = "capitalAreaLabel" },
+    town      = { show = "showAreaTownsHubs", scale = "townAreaLabelScale",
+                  auto = "townAutoScale", color = "townAreaLabel" },
+    subzone   = { show = "showAreaSubzoneNames", scale = "subzoneAreaLabelScale",
+                  color = "subzoneAreaLabel" },
 }
 
 local FONT = "Fonts\\FRIZQT__.TTF"
@@ -212,8 +212,8 @@ end
 --- loosest step when the kind's Auto-scale is on. The art and the labels
 --- both scale with the canvas, so zooming out shrinks a label on screen;
 --- Auto-scale grows it back by that ratio, and zooming in shrinks it.
-local function LabelScale(kind)
-    local scale = Config.db.labelScale * Config.db[KIND[kind].scale]
+local function AreaLabelScale(kind)
+    local scale = Config.db.areaLabelScale * Config.db[KIND[kind].scale]
     local auto = KIND[kind].auto
     if not (auto and Config.db[auto]) then return scale end
     local sc = WorldMapFrame.ScrollContainer
@@ -226,8 +226,8 @@ end
 
 --- Opacity of the labels. With Show on SD they are always fully visible.
 --- Otherwise they fade in with the HD side of the blend, from 50% up to 100%.
-local function LabelAlpha()
-    if Config.db.labelShowOnSD then return 1 end
+local function AreaLabelAlpha()
+    if Config.db.areaLabelShowOnSD then return 1 end
     return math.max(0, math.min(1, (Config:GetAlpha() - 0.5) * 2))
 end
 
@@ -271,7 +271,7 @@ end
 --- linearly to 1 at the tightest one. 0 when there are no additional levels.
 --- Always 1 with their Fade when zoomed off.
 local function SubzoneAlpha()
-    if not Config.db.subzoneLabelZoomFade then return 1 end
+    if not Config.db.subzoneAreaLabelZoomFade then return 1 end
     local extra = ns.ZoomLevels.extra
     local sc = WorldMapFrame.ScrollContainer
     local cur = sc and sc.currentScale
@@ -283,12 +283,12 @@ end
 
 --- Show or hide the labels for the map now on screen. Safe to call at any
 --- time, before the map has ever been opened included.
-function MapLabels:Refresh()
+function AreaLabels:Refresh()
     local canvas = WorldMapFrame.ScrollContainer
         and WorldMapFrame.ScrollContainer.Child
     local labels = {}
     local all = canvas and Config.db.enabled
-        and LABELS[WorldMapFrame:GetMapID() or 0]
+        and AREA_LABELS[WorldMapFrame:GetMapID() or 0]
     -- Under Fog of War only explored areas are labelled; continent names always
     -- show. A label's overlay is its area's explored-texture key (see emitter).
     local mapID = WorldMapFrame:GetMapID() or 0
@@ -313,16 +313,16 @@ function MapLabels:Refresh()
     end
 
     if not frame then
-        frame = CreateFrame("Frame", "HFWMForeverLabels", canvas)
+        frame = CreateFrame("Frame", "HFWMForeverAreaLabels", canvas)
         frame:EnableMouse(false)
-        frame:SetScript("OnSizeChanged", function() MapLabels:Refresh() end)
+        frame:SetScript("OnSizeChanged", function() AreaLabels:Refresh() end)
     end
     -- Re-parent if the canvas was replaced, as Renderer does for the overlay.
     if frame:GetParent() ~= canvas then frame:SetParent(canvas) end
     frame:SetAllPoints(canvas)
     frame:SetFrameLevel(canvas:GetFrameLevel() + 501)
     frame:Show()
-    local frameAlpha = LabelAlpha()
+    local frameAlpha = AreaLabelAlpha()
     frame:SetAlpha(frameAlpha)
 
     local subzoneAlpha = SubzoneAlpha()
@@ -336,7 +336,7 @@ function MapLabels:Refresh()
         end
         local alpha = label.kind == "subzone" and subzoneAlpha
             or ZoomFade(label.kind, step)
-        Paint(l, label, label.u * w, -label.v * h, LabelScale(label.kind),
+        Paint(l, label, label.u * w, -label.v * h, AreaLabelScale(label.kind),
             alpha * frameAlpha >= 1)
         Fade(l, alpha)
     end
@@ -347,8 +347,8 @@ end
 
 --- Re-lay the labels on every canvas zoom step, for Auto-scale. Called once
 --- from Core.lua's PLAYER_LOGIN handler, same timing as the other modules.
-function MapLabels:Start()
+function AreaLabels:Start()
     local sc = WorldMapFrame.ScrollContainer
     if not sc or not sc.OnCanvasScaleChanged then return end
-    hooksecurefunc(sc, "OnCanvasScaleChanged", function() MapLabels:Refresh() end)
+    hooksecurefunc(sc, "OnCanvasScaleChanged", function() AreaLabels:Refresh() end)
 end
