@@ -61,21 +61,19 @@ local AREA_LABEL_KINDS = {
                   auto = "continentAutoScale", color = "continentAreaLabel" },
     capital   = { show = "showAreaCapitalCities", scale = "capitalAreaLabelScale",
                   auto = "capitalAutoScale", color = "capitalAreaLabel",
-                  fade = "Fades these labels out as you zoom in: capital at "
-                      .. "60% one step in, gone at the next. Town and hub at "
-                      .. "60% two steps further in, gone one step after that. "
-                      .. "Off, they stay visible." },
+                  fade = "Fades these labels out when the zoom is beyond its "
+                      .. "level, to allow you to see detail that would "
+                      .. "otherwise be obscured." },
     town      = { show = "showAreaTownsHubs", scale = "townAreaLabelScale",
                   auto = "townAutoScale", color = "townAreaLabel",
-                  fade = "Fades these labels out as you zoom in: town and hub "
-                      .. "start at the second step, 60% at the third, gone at "
-                      .. "the fourth. Off, they stay visible." },
+                  fade = "Fades these labels out when the zoom is beyond its "
+                      .. "level, to allow you to see detail that would "
+                      .. "otherwise be obscured." },
     subzone   = { show = "showAreaSubzoneNames", scale = "subzoneAreaLabelScale",
                   color = "subzoneAreaLabel",
-                  fade = "Fades these labels in over the additional zoom "
-                      .. "levels, starting at the first one (50% of the zoom "
-                      .. "range). Off, they show at every zoom. Needs "
-                      .. "Additional zoom levels on." },
+                  fade = "Fades these labels out when the zoom is beyond its "
+                      .. "level, to allow you to see detail that would "
+                      .. "otherwise be obscured." },
 }
 
 --- Every Config.db field of one label kind, for Reset to defaults.
