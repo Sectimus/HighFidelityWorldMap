@@ -83,7 +83,11 @@ local function AreaLabelKeys(k)
     for _, suffix in ipairs({ "ColorMode", "Color", "Color2", "GradientDir", "Outline" }) do
         keys[#keys + 1] = k.color .. suffix
     end
-    if k.fade then keys[#keys + 1] = k.color .. "ZoomFade" end
+    if k.fade then
+        for _, suffix in ipairs({ "ZoomFade", "FadeVisibleAt", "FadeInvisibleAt", "FadeInSpeed", "FadeOutSpeed" }) do
+            keys[#keys + 1] = k.color .. suffix
+        end
+    end
     return keys
 end
 
@@ -107,6 +111,96 @@ local function DiffersFromDefaults(keys)
         end
     end
     return false
+end
+
+--- The fade settings of one fading label kind (*k*), as a subsection of its Area
+--- Labels section. Hidden while its Fade when zoomed is off.
+local function AreaLabelFadeSection(order, k)
+    local showKey, colorKey = k.show, k.color
+    local function FadeOff()
+        return not Config.db[showKey] or not Config.db[colorKey .. "ZoomFade"]
+    end
+    return {
+        order = order,
+        type = "group",
+        inline = true,
+        name = "Fade",
+        hidden = function() return not Config.db[colorKey .. "ZoomFade"] end,
+        args = {
+            fadeVisibleAt = {
+                order = 1,
+                type = "range",
+                name = "Fully visible at",
+                desc = "The zoom level where these labels are fully shown. "
+                    .. "0 is the furthest out; each step is one scroll-wheel "
+                    .. "click in. Its marker is the map's own maximum zoom.",
+                disabled = FadeOff,
+                min = 0, max = 11, step = 1,
+                get = function() return Config.db[colorKey .. "FadeVisibleAt"] end,
+                set = function(_, value)
+                    -- Ends must differ: equal values would make the fade undefined.
+                    -- A clash keeps the stored value; the handle still follows the drag.
+                    if value == Config.db[colorKey .. "FadeInvisibleAt"] then return end
+                    Config.db[colorKey .. "FadeVisibleAt"] = value
+                    ns.AreaLabels:Refresh()
+                end,
+            },
+            fadeInvisibleAt = {
+                order = 2,
+                type = "range",
+                name = "Fully invisible at",
+                desc = "The zoom level where these labels are fully hidden. "
+                    .. "0 is the furthest out; each step is one scroll-wheel "
+                    .. "click in. Its marker is the map's own maximum zoom.",
+                disabled = FadeOff,
+                min = 0, max = 11, step = 1,
+                get = function() return Config.db[colorKey .. "FadeInvisibleAt"] end,
+                set = function(_, value)
+                    -- Ends must differ: equal values would make the fade undefined.
+                    -- A clash keeps the stored value; the handle still follows the drag.
+                    if value == Config.db[colorKey .. "FadeVisibleAt"] then return end
+                    Config.db[colorKey .. "FadeInvisibleAt"] = value
+                    ns.AreaLabels:Refresh()
+                end,
+            },
+            fadeSpeeds = {
+                order = 3,
+                type = "group",
+                inline = true,
+                name = "",
+                args = {
+                    fadeInSpeed = {
+                        order = 1,
+                        type = "range",
+                        name = "Fade-in intensity",
+                        desc = "How harsh the fade-in animation is, lower value will make "
+                            .. "the text visible for longer before switching states",
+                        disabled = FadeOff,
+                        min = 0, max = 2, step = 0.05,
+                        get = function() return Config.db[colorKey .. "FadeInSpeed"] end,
+                        set = function(_, value)
+                            Config.db[colorKey .. "FadeInSpeed"] = value
+                            ns.AreaLabels:Refresh()
+                        end,
+                    },
+                    fadeOutSpeed = {
+                        order = 2,
+                        type = "range",
+                        name = "Fade-out intensity",
+                        desc = "How harsh the fade-out animation is, lower value will make "
+                            .. "the text visible for longer before switching states",
+                        disabled = FadeOff,
+                        min = 0, max = 2, step = 0.05,
+                        get = function() return Config.db[colorKey .. "FadeOutSpeed"] end,
+                        set = function(_, value)
+                            Config.db[colorKey .. "FadeOutSpeed"] = value
+                            ns.AreaLabels:Refresh()
+                        end,
+                    },
+                },
+            },
+        },
+    }
 end
 
 --- An Area Labels section, boxed like Map Background: an Enabled toggle for one
@@ -270,6 +364,7 @@ local function AreaLabelSection(order, title, k, desc)
                     ns.Options:Refresh()
                 end,
             },
+            fade = k.fade and AreaLabelFadeSection(40, k) or nil,
         },
     }
 end
@@ -481,7 +576,7 @@ end
 -- popup's data.
 StaticPopupDialogs["HFWM_RESET_PAGE"] = {
     text = "Reset the %s settings to their defaults?\n"
-        .. "Settings on other pages are left alone.",
+        .. "Settings on other pages are left unchanged, to reset all settings to default, use the Profiles tab.",
     button1 = ACCEPT,
     button2 = CANCEL,
     OnAccept = function(_, page)
@@ -701,11 +796,11 @@ local options = {
                     AREA_LABEL_KINDS.capital,
                     "Shows the names of capital cities, such as "
                         .. "Stormwind and Ironforge."),
-                townAreaLabels = AreaLabelSection(22, "Towns/Hubs",
+                townAreaLabels = AreaLabelSection(23, "Towns/Hubs",
                     AREA_LABEL_KINDS.town,
                     "Shows the names of towns and hubs, such as "
                         .. "Goldshire and Northshire."),
-                subzoneAreaLabels = AreaLabelSection(23, "Subzones",
+                subzoneAreaLabels = AreaLabelSection(25, "Subzones",
                     AREA_LABEL_KINDS.subzone,
                     "Shows the names of outdoor areas inside a zone, such as "
                         .. "Gol'Bolar Quarry."),

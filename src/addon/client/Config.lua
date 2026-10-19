@@ -178,12 +178,28 @@ Config.DEFAULTS = {
     capitalAreaLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
     townAreaLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
     subzoneAreaLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
-    -- Fade when zoomed, per type: capital and town labels fade out as the map
-    -- is zoomed in, subzone labels fade in over the additional zoom levels.
-    -- Off, the label shows at every zoom. See AreaLabels.lua.
+    -- Fade when zoomed, per type. Two zoom ladder steps (0 furthest out, 11
+    -- the most zoomed in) bound the fade: FadeVisibleAt is where the label is
+    -- fully shown, FadeInvisibleAt where it is fully hidden. Speed sets how
+    -- the curve bends between them; 1 is linear. Capital and town fade out
+    -- as you zoom in, so their visible step is below the invisible one;
+    -- subzone fades in, the other way round. Off, the label shows at every
+    -- zoom. See AreaLabels.lua's ZoomFade.
     capitalAreaLabelZoomFade = true,
+    capitalAreaLabelFadeVisibleAt = 0,
+    capitalAreaLabelFadeInvisibleAt = 3,
+    capitalAreaLabelFadeInSpeed = 1,
+    capitalAreaLabelFadeOutSpeed = 1,
     townAreaLabelZoomFade = true,
+    townAreaLabelFadeVisibleAt = 0,
+    townAreaLabelFadeInvisibleAt = 3,
+    townAreaLabelFadeInSpeed = 1,
+    townAreaLabelFadeOutSpeed = 1,
     subzoneAreaLabelZoomFade = true,
+    subzoneAreaLabelFadeVisibleAt = 11,
+    subzoneAreaLabelFadeInvisibleAt = 3,
+    subzoneAreaLabelFadeInSpeed = 1,
+    subzoneAreaLabelFadeOutSpeed = 1,
     -- "Show on SD" (Options): labels stay fully visible across the whole HD/SD
     -- blend, not just its HD half. See AreaLabels' AreaLabelAlpha.
     areaLabelShowOnSD = false,
