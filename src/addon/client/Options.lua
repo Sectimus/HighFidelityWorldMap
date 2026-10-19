@@ -125,15 +125,16 @@ local function AreaLabelFadeSection(order, k)
         type = "group",
         inline = true,
         name = "Fade",
-        hidden = function() return not Config.db[colorKey .. "ZoomFade"] end,
+        hidden = function() return not Config.db[showKey] or not Config.db[colorKey .. "ZoomFade"] end,
         args = {
             fadeVisibleAt = {
                 order = 1,
                 type = "range",
                 name = "Fully visible at",
-                desc = "The zoom level where these labels are fully shown. "
-                    .. "0 is the furthest out; each step is one scroll-wheel "
-                    .. "click in. Its marker is the map's own maximum zoom.",
+                desc = "What zoom level should this label type be fully visible at?\n"
+                    .. "0 is fully zoomed out (default view)\n"
+                    .. "3 is the default fully zoomed in\n"
+                    .. "11 is the max zoom level you can zoom in to when the \"Additional zoom levels\" setting is enabled.",
                 disabled = FadeOff,
                 min = 0, max = 11, step = 1,
                 get = function() return Config.db[colorKey .. "FadeVisibleAt"] end,
@@ -149,9 +150,10 @@ local function AreaLabelFadeSection(order, k)
                 order = 2,
                 type = "range",
                 name = "Fully invisible at",
-                desc = "The zoom level where these labels are fully hidden. "
-                    .. "0 is the furthest out; each step is one scroll-wheel "
-                    .. "click in. Its marker is the map's own maximum zoom.",
+                desc = "What zoom level should this label type be fully invisible at?\n"
+                    .. "0 is fully zoomed out (default view)\n"
+                    .. "3 is the default fully zoomed in\n"
+                    .. "11 is the max zoom level you can zoom in to when the \"Additional zoom levels\" setting is enabled.",
                 disabled = FadeOff,
                 min = 0, max = 11, step = 1,
                 get = function() return Config.db[colorKey .. "FadeInvisibleAt"] end,
@@ -232,7 +234,7 @@ local function AreaLabelSection(order, title, k, desc)
                 desc = "Grows these labels as you zoom out and shrinks them "
                     .. "as you zoom in, starting from the label scale at the "
                     .. "loosest zoom.",
-                disabled = function() return not Config.db[showKey] end,
+                hidden = function() return not Config.db[showKey] end,
                 get = function() return Config.db[autoKey] end,
                 set = function(_, value)
                     Config.db[autoKey] = value
@@ -251,8 +253,7 @@ local function AreaLabelSection(order, title, k, desc)
                 type = "toggle",
                 name = "Fade when zoomed",
                 desc = k.fade,
-                hidden = function() return not k.fade end,
-                disabled = function() return not Config.db[showKey] end,
+                hidden = function() return not k.fade or not Config.db[showKey] end,
                 get = function() return Config.db[colorKey .. "ZoomFade"] end,
                 set = function(_, value)
                     Config.db[colorKey .. "ZoomFade"] = value
@@ -266,7 +267,7 @@ local function AreaLabelSection(order, title, k, desc)
                 desc = "Size of these labels, as a multiple of their default "
                     .. "size. Applies on top of the Global label scale.",
                 min = 0.5, max = 2, step = 0.05, isPercent = true,
-                disabled = function() return not Config.db[showKey] end,
+                hidden = function() return not Config.db[showKey] end,
                 get = function() return Config.db[scaleKey] / Config.DEFAULTS[scaleKey] end,
                 set = function(_, value)
                     Config.db[scaleKey] = value * Config.DEFAULTS[scaleKey]
@@ -279,7 +280,7 @@ local function AreaLabelSection(order, title, k, desc)
                 name = "Colour",
                 values = { solid = "Solid", gradient = "Gradient" },
                 sorting = { "solid", "gradient" },
-                disabled = function() return not Config.db[showKey] end,
+                hidden = function() return not Config.db[showKey] end,
                 get = function() return Config.db[colorKey .. "ColorMode"] end,
                 set = function(_, value)
                     Config.db[colorKey .. "ColorMode"] = value
@@ -294,7 +295,7 @@ local function AreaLabelSection(order, title, k, desc)
                     return Config.db[colorKey .. "ColorMode"] == "gradient"
                         and "#1" or "Colour"
                 end,
-                disabled = function() return not Config.db[showKey] end,
+                hidden = function() return not Config.db[showKey] end,
                 get = function() return unpack(Config.db[colorKey .. "Color"]) end,
                 set = function(_, r, g, b)
                     Config.db[colorKey .. "Color"] = { r, g, b }
@@ -307,9 +308,8 @@ local function AreaLabelSection(order, title, k, desc)
                 type = "color",
                 name = "#2",
                 hidden = function()
-                    return Config.db[colorKey .. "ColorMode"] ~= "gradient"
+                    return not Config.db[showKey] or Config.db[colorKey .. "ColorMode"] ~= "gradient"
                 end,
-                disabled = function() return not Config.db[showKey] end,
                 get = function() return unpack(Config.db[colorKey .. "Color2"]) end,
                 set = function(_, r, g, b)
                     Config.db[colorKey .. "Color2"] = { r, g, b }
@@ -322,7 +322,7 @@ local function AreaLabelSection(order, title, k, desc)
                 type = "color",
                 name = "Outline",
                 desc = "Colour of the outline around these labels.",
-                disabled = function() return not Config.db[showKey] end,
+                hidden = function() return not Config.db[showKey] end,
                 get = function() return unpack(Config.db[colorKey .. "Outline"]) end,
                 set = function(_, r, g, b)
                     Config.db[colorKey .. "Outline"] = { r, g, b }
@@ -337,9 +337,8 @@ local function AreaLabelSection(order, title, k, desc)
                            VERTICAL = "Top to bottom" },
                 sorting = { "HORIZONTAL", "VERTICAL" },
                 hidden = function()
-                    return Config.db[colorKey .. "ColorMode"] ~= "gradient"
+                    return not Config.db[showKey] or Config.db[colorKey .. "ColorMode"] ~= "gradient"
                 end,
-                disabled = function() return not Config.db[showKey] end,
                 get = function() return Config.db[colorKey .. "GradientDir"] end,
                 set = function(_, value)
                     Config.db[colorKey .. "GradientDir"] = value
@@ -348,7 +347,7 @@ local function AreaLabelSection(order, title, k, desc)
             },
             reset = {
                 order = 1,
-                hidden = function() return not DiffersFromDefaults(AreaLabelKeys(k)) end,
+                hidden = function() return not Config.db[showKey] or not DiffersFromDefaults(AreaLabelKeys(k)) end,
                 type = "execute",
                 dialogControl = SECTION_RESET,
                 name = "Reset to defaults",
