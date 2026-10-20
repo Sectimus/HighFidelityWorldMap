@@ -231,54 +231,52 @@ local function AreaLabelAlpha()
     return math.max(0, math.min(1, (Config:GetAlpha() - 0.5) * 2))
 end
 
---- Where the canvas sits on the zoom ladder, as a fractional step: 1 at the
---- loosest step, 2 at the next, and so on. The additional zoom levels are
---- steps too. Clamped to the ladder's ends.
+--- The canvas's current zoom ladder step, fractional between two entries. 0
+--- is the loosest, the last index the tightest. Nil when the ladder isn't there.
 local function LadderStep()
     local sc = WorldMapFrame.ScrollContainer
     local levels = sc and sc.zoomLevels
     local cur = sc and sc.currentScale
-    if not (levels and cur and #levels > 0) then return 1 end
+    if not (levels and cur and #levels > 0) then return nil end
     for k = 1, #levels - 1 do
         local a, b = levels[k].scale, levels[k + 1].scale
-        if cur < b then return k + math.max(0, (cur - a) / (b - a)) end
+        if cur < b then return (k - 1) + math.max(0, (cur - a) / (b - a)) end
     end
-    return #levels
+    return #levels - 1
 end
 
--- Opacity of capital and town labels by ladder step, when their Fade when
--- zoomed option is on. Linear between the points; 1 before the first.
-local FADE_STEPS = {
-    capital = { { 1, 1 }, { 2, 0.6 }, { 3, 0 } },
-    town = { { 1, 1 }, { 2, 1 }, { 3, 0.6 }, { 4, 0 } },
-}
-
---- Opacity from zoom for a capital or town label; 1 for any other kind, or
---- with the kind's Fade when zoomed off.
-local function ZoomFade(kind, step)
-    local keys = FADE_STEPS[kind]
-    if not keys or not Config.db[KIND[kind].color .. "ZoomFade"] then return 1 end
-    if step <= keys[1][1] then return keys[1][2] end
-    for i = 2, #keys do
-        local s0, a0 = keys[i - 1][1], keys[i - 1][2]
-        local s1, a1 = keys[i][1], keys[i][2]
-        if step <= s1 then return a0 + (a1 - a0) * (step - s0) / (s1 - s0) end
+--- Opacity of a label of *kind* from zoom. 1 when the kind has no Fade when
+--- zoomed, or it is off. Fully visible at the kind's Fully visible step and
+--- fully hidden at its Fully invisible step, whichever order they come in
+--- (the order sets the direction). Fade speed bends the curve between them:
+--- 1 is linear; higher starts the change sooner and eases in at the far end;
+--- lower holds the label until just before that end.
+local function ZoomFade(kind)
+    local key = KIND[kind].color
+    if not Config.db[key .. "ZoomFade"] then return 1 end
+    local step = LadderStep()
+    step = step or 0 -- ladder not built yet: the zone view's default is level 0
+    local vis = Config.db[key .. "FadeVisibleAt"]
+    local inv = Config.db[key .. "FadeInvisibleAt"]
+    if vis == inv then return step >= vis and 1 or 0 end
+    if inv > vis and step < vis then
+        -- Below the visible step, a fade-out label fades in from nothing at step 0
+        -- up to full at the visible step. Fade-in speed bends it; 0 is a hard switch.
+        local fin = Config.db[key .. "FadeInSpeed"]
+        if fin == 0 then return 0 end
+        return (step / vis) ^ (1 / fin)
     end
-    return keys[#keys][2]
-end
-
---- Opacity of subzone labels: 0 at the first additional zoom level, rising
---- linearly to 1 at the tightest one. 0 when there are no additional levels.
---- Always 1 with their Fade when zoomed off.
-local function SubzoneAlpha()
-    if not Config.db.subzoneAreaLabelZoomFade then return 1 end
-    local extra = ns.ZoomLevels.extra
-    local sc = WorldMapFrame.ScrollContainer
-    local cur = sc and sc.currentScale
-    if not extra or not cur then return 0 end
-    local span = extra.to - extra.from
-    if span <= 0 then return cur >= extra.to and 1 or 0 end
-    return math.max(0, math.min(1, (cur - extra.from) / span))
+    local t = math.max(0, math.min(1, (step - vis) / (inv - vis)))
+    if inv > vis then
+        -- Fade-out: between the two ends. Fade-out speed bends it; 0 is a hard switch.
+        local fout = Config.db[key .. "FadeOutSpeed"]
+        if fout == 0 then return step >= inv and 0 or 1 end
+        return (1 - t) ^ fout
+    end
+    -- Fade-in (subzone): between the two ends, using fade-in speed; 0 is a hard switch.
+    local fin = Config.db[key .. "FadeInSpeed"]
+    if fin == 0 then return step >= vis and 1 or 0 end
+    return 1 - t ^ fin
 end
 
 --- Show or hide the labels for the map now on screen. Safe to call at any
@@ -325,8 +323,6 @@ function AreaLabels:Refresh()
     local frameAlpha = AreaLabelAlpha()
     frame:SetAlpha(frameAlpha)
 
-    local subzoneAlpha = SubzoneAlpha()
-    local step = LadderStep()
     local w, h = canvas:GetSize()
     for i, label in ipairs(labels) do
         local l = labelFrames[i]
@@ -334,8 +330,7 @@ function AreaLabels:Refresh()
             l = NewLabel()
             labelFrames[i] = l
         end
-        local alpha = label.kind == "subzone" and subzoneAlpha
-            or ZoomFade(label.kind, step)
+        local alpha = ZoomFade(label.kind)
         Paint(l, label, label.u * w, -label.v * h, AreaLabelScale(label.kind),
             alpha * frameAlpha >= 1)
         Fade(l, alpha)

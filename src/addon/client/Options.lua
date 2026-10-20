@@ -73,21 +73,19 @@ local AREA_LABEL_KINDS = {
                   auto = "continentAutoScale", color = "continentAreaLabel" },
     capital   = { show = "showAreaCapitalCities", scale = "capitalAreaLabelScale",
                   auto = "capitalAutoScale", color = "capitalAreaLabel",
-                  fade = "Fades these labels out as you zoom in: capital at "
-                      .. "60% one step in, gone at the next. Town and hub at "
-                      .. "60% two steps further in, gone one step after that. "
-                      .. "Off, they stay visible." },
+                  fade = "Fades these labels out when the zoom is beyond its "
+                      .. "level, to allow you to see detail that would "
+                      .. "otherwise be obscured." },
     town      = { show = "showAreaTownsHubs", scale = "townAreaLabelScale",
                   auto = "townAutoScale", color = "townAreaLabel",
-                  fade = "Fades these labels out as you zoom in: town and hub "
-                      .. "start at the second step, 60% at the third, gone at "
-                      .. "the fourth. Off, they stay visible." },
+                  fade = "Fades these labels out when the zoom is beyond its "
+                      .. "level, to allow you to see detail that would "
+                      .. "otherwise be obscured." },
     subzone   = { show = "showAreaSubzoneNames", scale = "subzoneAreaLabelScale",
                   color = "subzoneAreaLabel",
-                  fade = "Fades these labels in over the additional zoom "
-                      .. "levels, starting at the first one (50% of the zoom "
-                      .. "range). Off, they show at every zoom. Needs "
-                      .. "Additional zoom levels on." },
+                  fade = "Fades these labels out when the zoom is beyond its "
+                      .. "level, to allow you to see detail that would "
+                      .. "otherwise be obscured." },
 }
 
 --- Every Config.db field of one label kind, for Reset to defaults.
@@ -97,7 +95,11 @@ local function AreaLabelKeys(k)
     for _, suffix in ipairs({ "ColorMode", "Color", "Color2", "GradientDir", "Outline" }) do
         keys[#keys + 1] = k.color .. suffix
     end
-    if k.fade then keys[#keys + 1] = k.color .. "ZoomFade" end
+    if k.fade then
+        for _, suffix in ipairs({ "ZoomFade", "FadeVisibleAt", "FadeInvisibleAt", "FadeInSpeed", "FadeOutSpeed" }) do
+            keys[#keys + 1] = k.color .. suffix
+        end
+    end
     return keys
 end
 
@@ -121,6 +123,98 @@ local function DiffersFromDefaults(keys)
         end
     end
     return false
+end
+
+--- The fade settings of one fading label kind (*k*), as a subsection of its Area
+--- Labels section. Hidden while its Fade when zoomed is off.
+local function AreaLabelFadeSection(order, k)
+    local showKey, colorKey = k.show, k.color
+    local function FadeOff()
+        return not Config.db[showKey] or not Config.db[colorKey .. "ZoomFade"]
+    end
+    return {
+        order = order,
+        type = "group",
+        inline = true,
+        name = "Fade",
+        hidden = function() return not Config.db[showKey] or not Config.db[colorKey .. "ZoomFade"] end,
+        args = {
+            fadeVisibleAt = {
+                order = 1,
+                type = "range",
+                name = "Fully visible at",
+                desc = "What zoom level should this label type be fully visible at?\n"
+                    .. "0 is fully zoomed out (default view)\n"
+                    .. "3 is the default fully zoomed in\n"
+                    .. "11 is the max zoom level you can zoom in to when the \"Additional zoom levels\" setting is enabled.",
+                disabled = FadeOff,
+                min = 0, max = 11, step = 1,
+                get = function() return Config.db[colorKey .. "FadeVisibleAt"] end,
+                set = function(_, value)
+                    -- Ends must differ: equal values would make the fade undefined.
+                    -- A clash keeps the stored value; the handle still follows the drag.
+                    if value == Config.db[colorKey .. "FadeInvisibleAt"] then return end
+                    Config.db[colorKey .. "FadeVisibleAt"] = value
+                    ns.AreaLabels:Refresh()
+                end,
+            },
+            fadeInvisibleAt = {
+                order = 2,
+                type = "range",
+                name = "Fully invisible at",
+                desc = "What zoom level should this label type be fully invisible at?\n"
+                    .. "0 is fully zoomed out (default view)\n"
+                    .. "3 is the default fully zoomed in\n"
+                    .. "11 is the max zoom level you can zoom in to when the \"Additional zoom levels\" setting is enabled.",
+                disabled = FadeOff,
+                min = 0, max = 11, step = 1,
+                get = function() return Config.db[colorKey .. "FadeInvisibleAt"] end,
+                set = function(_, value)
+                    -- Ends must differ: equal values would make the fade undefined.
+                    -- A clash keeps the stored value; the handle still follows the drag.
+                    if value == Config.db[colorKey .. "FadeVisibleAt"] then return end
+                    Config.db[colorKey .. "FadeInvisibleAt"] = value
+                    ns.AreaLabels:Refresh()
+                end,
+            },
+            fadeSpeeds = {
+                order = 3,
+                type = "group",
+                inline = true,
+                name = "",
+                args = {
+                    fadeInSpeed = {
+                        order = 1,
+                        type = "range",
+                        name = "Fade-in intensity",
+                        desc = "How harsh the fade-in animation is, lower value will make "
+                            .. "the text visible for longer before switching states",
+                        disabled = FadeOff,
+                        min = 0, max = 2, step = 0.05,
+                        get = function() return Config.db[colorKey .. "FadeInSpeed"] end,
+                        set = function(_, value)
+                            Config.db[colorKey .. "FadeInSpeed"] = value
+                            ns.AreaLabels:Refresh()
+                        end,
+                    },
+                    fadeOutSpeed = {
+                        order = 2,
+                        type = "range",
+                        name = "Fade-out intensity",
+                        desc = "How harsh the fade-out animation is, lower value will make "
+                            .. "the text visible for longer before switching states",
+                        disabled = FadeOff,
+                        min = 0, max = 2, step = 0.05,
+                        get = function() return Config.db[colorKey .. "FadeOutSpeed"] end,
+                        set = function(_, value)
+                            Config.db[colorKey .. "FadeOutSpeed"] = value
+                            ns.AreaLabels:Refresh()
+                        end,
+                    },
+                },
+            },
+        },
+    }
 end
 
 --- An Area Labels section, boxed like Map Background: an Enabled toggle for one
@@ -152,7 +246,7 @@ local function AreaLabelSection(order, title, k, desc)
                 desc = "Grows these labels as you zoom out and shrinks them "
                     .. "as you zoom in, starting from the label scale at the "
                     .. "loosest zoom.",
-                disabled = function() return not Config.db[showKey] end,
+                hidden = function() return not Config.db[showKey] end,
                 get = function() return Config.db[autoKey] end,
                 set = function(_, value)
                     Config.db[autoKey] = value
@@ -171,8 +265,7 @@ local function AreaLabelSection(order, title, k, desc)
                 type = "toggle",
                 name = "Fade when zoomed",
                 desc = k.fade,
-                hidden = function() return not k.fade end,
-                disabled = function() return not Config.db[showKey] end,
+                hidden = function() return not k.fade or not Config.db[showKey] end,
                 get = function() return Config.db[colorKey .. "ZoomFade"] end,
                 set = function(_, value)
                     Config.db[colorKey .. "ZoomFade"] = value
@@ -186,7 +279,7 @@ local function AreaLabelSection(order, title, k, desc)
                 desc = "Size of these labels, as a multiple of their default "
                     .. "size. Applies on top of the Global label scale.",
                 min = 0.5, max = 2, step = 0.05, isPercent = true,
-                disabled = function() return not Config.db[showKey] end,
+                hidden = function() return not Config.db[showKey] end,
                 get = function() return Config.db[scaleKey] / Config.DEFAULTS[scaleKey] end,
                 set = function(_, value)
                     Config.db[scaleKey] = value * Config.DEFAULTS[scaleKey]
@@ -199,7 +292,7 @@ local function AreaLabelSection(order, title, k, desc)
                 name = "Colour",
                 values = { solid = "Solid", gradient = "Gradient" },
                 sorting = { "solid", "gradient" },
-                disabled = function() return not Config.db[showKey] end,
+                hidden = function() return not Config.db[showKey] end,
                 get = function() return Config.db[colorKey .. "ColorMode"] end,
                 set = function(_, value)
                     Config.db[colorKey .. "ColorMode"] = value
@@ -214,7 +307,7 @@ local function AreaLabelSection(order, title, k, desc)
                     return Config.db[colorKey .. "ColorMode"] == "gradient"
                         and "#1" or "Colour"
                 end,
-                disabled = function() return not Config.db[showKey] end,
+                hidden = function() return not Config.db[showKey] end,
                 get = function() return unpack(Config.db[colorKey .. "Color"]) end,
                 set = function(_, r, g, b)
                     Config.db[colorKey .. "Color"] = { r, g, b }
@@ -227,9 +320,8 @@ local function AreaLabelSection(order, title, k, desc)
                 type = "color",
                 name = "#2",
                 hidden = function()
-                    return Config.db[colorKey .. "ColorMode"] ~= "gradient"
+                    return not Config.db[showKey] or Config.db[colorKey .. "ColorMode"] ~= "gradient"
                 end,
-                disabled = function() return not Config.db[showKey] end,
                 get = function() return unpack(Config.db[colorKey .. "Color2"]) end,
                 set = function(_, r, g, b)
                     Config.db[colorKey .. "Color2"] = { r, g, b }
@@ -242,7 +334,7 @@ local function AreaLabelSection(order, title, k, desc)
                 type = "color",
                 name = "Outline",
                 desc = "Colour of the outline around these labels.",
-                disabled = function() return not Config.db[showKey] end,
+                hidden = function() return not Config.db[showKey] end,
                 get = function() return unpack(Config.db[colorKey .. "Outline"]) end,
                 set = function(_, r, g, b)
                     Config.db[colorKey .. "Outline"] = { r, g, b }
@@ -257,9 +349,8 @@ local function AreaLabelSection(order, title, k, desc)
                            VERTICAL = "Top to bottom" },
                 sorting = { "HORIZONTAL", "VERTICAL" },
                 hidden = function()
-                    return Config.db[colorKey .. "ColorMode"] ~= "gradient"
+                    return not Config.db[showKey] or Config.db[colorKey .. "ColorMode"] ~= "gradient"
                 end,
-                disabled = function() return not Config.db[showKey] end,
                 get = function() return Config.db[colorKey .. "GradientDir"] end,
                 set = function(_, value)
                     Config.db[colorKey .. "GradientDir"] = value
@@ -268,7 +359,7 @@ local function AreaLabelSection(order, title, k, desc)
             },
             reset = {
                 order = 1,
-                hidden = function() return not DiffersFromDefaults(AreaLabelKeys(k)) end,
+                hidden = function() return not Config.db[showKey] or not DiffersFromDefaults(AreaLabelKeys(k)) end,
                 type = "execute",
                 dialogControl = SECTION_RESET,
                 name = "Reset to defaults",
@@ -284,6 +375,7 @@ local function AreaLabelSection(order, title, k, desc)
                     ns.Options:Refresh()
                 end,
             },
+            fade = k.fade and AreaLabelFadeSection(40, k) or nil,
         },
     }
 end
@@ -495,7 +587,7 @@ end
 -- popup's data.
 StaticPopupDialogs["HFWM_RESET_PAGE"] = {
     text = "Reset the %s settings to their defaults?\n"
-        .. "Settings on other pages are left alone.",
+        .. "Settings on other pages are left unchanged, to reset all settings to default, use the Profiles tab.",
     button1 = ACCEPT,
     button2 = CANCEL,
     OnAccept = function(_, page)
@@ -716,11 +808,11 @@ local options = {
                     AREA_LABEL_KINDS.capital,
                     "Shows the names of capital cities, such as "
                         .. "Stormwind and Ironforge."),
-                townAreaLabels = AreaLabelSection(22, "Towns/Hubs",
+                townAreaLabels = AreaLabelSection(23, "Towns/Hubs",
                     AREA_LABEL_KINDS.town,
                     "Shows the names of towns and hubs, such as "
                         .. "Goldshire and Northshire."),
-                subzoneAreaLabels = AreaLabelSection(23, "Subzones",
+                subzoneAreaLabels = AreaLabelSection(25, "Subzones",
                     AREA_LABEL_KINDS.subzone,
                     "Shows the names of outdoor areas inside a zone, such as "
                         .. "Gol'Bolar Quarry."),
@@ -1255,6 +1347,18 @@ combatWatch:RegisterEvent("PLAYER_REGEN_DISABLED")
 combatWatch:RegisterEvent("PLAYER_REGEN_ENABLED")
 combatWatch:SetScript("OnEvent", function() UpdatePreview() end)
 
+--- Expand or collapse an addon's top-level category in the Blizzard Settings
+--- tree, so its subpages are listed or hidden. Same calls Blizzard's own
+--- OpenToCategory makes: flag the category, then rebuild the list. No-op when
+--- already in that state or when the Settings panel isn't loaded.
+local function SetSettingsCategoryExpanded(category, expanded)
+    local list = _G.SettingsPanel and _G.SettingsPanel:GetCategoryList()
+    local entry = list and category and list:GetCategory(category.ID)
+    if not entry or entry:IsExpanded() == expanded then return end
+    entry:SetExpanded(expanded)
+    list:CreateCategories()
+end
+
 --- AceConfigDialog:AddToBlizOptions, minus one line: on clients without
 --- C_SettingsUtil.OpenSettingsPanel (Forever) it overwrites the Blizzard
 --- category's ID with the panel name. That addon write taints the Settings
@@ -1266,10 +1370,16 @@ combatWatch:SetScript("OnEvent", function() UpdatePreview() end)
 --- Returns the canvas frame and the Settings category.
 local function RegisterClientPanel(AceConfigDialog, appName, title, parentCategory)
     local group = LibStub("AceGUI-3.0"):Create("BlizOptionsGroup")
+    local category
     group:SetTitle(title)
     group:SetUserData("appName", appName)
     group:SetCallback("OnShow", function(widget)
         AceConfigDialog:Open(appName, widget)
+        if not parentCategory then
+            C_Timer.After(0, function()
+                SetSettingsCategoryExpanded(category, true)
+            end)
+        end
         PanelShown(widget.frame)
     end)
     group:SetCallback("OnHide", function(widget)
@@ -1281,7 +1391,6 @@ local function RegisterClientPanel(AceConfigDialog, appName, title, parentCatego
         end)
     end)
 
-    local category
     if parentCategory then
         category = Settings.RegisterCanvasLayoutSubcategory(parentCategory, group.frame, title)
         group:SetName(category.ID, parentCategory.ID)
@@ -1338,6 +1447,15 @@ function Options:Init()
                 AceConfigDialog, page.app, page.title, category)
             frames[#frames + 1] = { frame, page }
         end
+        -- Collapse the add-on's entry once the user selects any Settings page
+        -- that isn't it or one of its subpages. Deferred for the same taint
+        -- reason as the close hook above.
+        EventRegistry:RegisterCallback("Settings.CategoryChanged", function(_, selected)
+            if selected == category or selected:GetParentCategory() == category then return end
+            C_Timer.After(0, function()
+                SetSettingsCategoryExpanded(category, false)
+            end)
+        end, category)
     end)
     registered = ok
     self.clientRegistered = ok
