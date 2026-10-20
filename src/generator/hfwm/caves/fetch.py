@@ -67,49 +67,44 @@ def fetch_tile(fdid: int) -> Image.Image:
     return img
 
 
-# Fixed pixel pitch every WMO-group minimap sub-tile is baked at, confirmed
-# across every multi-subtile group seen so far (md_crypt_d, md_warmcave,
-# md_junglecave/md_junglecave07, md_mountaincave_medium_h, mini-hive_e, the
-# md_hive family): every "_<group>_<row>_<col>.blp" file is exactly 256x256,
-# regardless of WMO or group -- the same convention hfwm/config/tiles.py's
-# NATIVE_ZONE_TILE_PX documents for outdoor Type=Zone tiles. A room whose
-# baked art needs more than one tile is simply several of these pasted
-# edge-to-edge, uncropped, before the whole assembled room gets the same
-# single alpha-bbox crop fetch_tile() gives a lone tile.
+# Grid pitch of a multi-subtile group's cells. A tile is at most this big (a
+# narrow room's tiles can be 128 wide); see stitch_subtiles for the layout.
 WMO_SUBTILE_PX = 256
 
 
-def fetch_stitched_tile(subtile_fdids: dict[tuple[int, int], int]) -> Image.Image:
-    """Fetch and assemble a group's minimap art from more than one raw
-    sub-tile, for a room too large for the single-tile case ``fetch_tile``
-    handles.
+def stitch_subtiles(subtile_fdids: dict[tuple[int, int], int]):
+    """``(canvas, rects)``: a multi-sub-tile group's raw tiles assembled
+    uncropped, and each tile's ``(x, y, w, h)`` on that canvas.
 
-    Each sub-tile is keyed by its own ``(row, col)`` position in the
-    group's local tile grid (from the ``..._<group:03d>_<row:02d>_<col:02d>
-    .blp`` filename -- see the package docstring (hfwm/caves/__init__.py)). Unlike ``fetch_tile``,
-    individual sub-tiles are pasted *uncropped* at their grid position
-    (``col * WMO_SUBTILE_PX, row * WMO_SUBTILE_PX``) — cropping each one
-    first would throw away its position within the room, which is exactly
-    the information the grid encodes. The alpha-bbox crop ``fetch_tile``
-    does is instead applied once, to the fully assembled room, for the
-    same reason it's applied there: real room content is opaque, the
-    padding around it (now spread across however many sub-tiles border
-    the room's edge) is fully transparent.
+    A key ``(a, b)`` comes from the filename ``..._<group:03d>_<a:02d>_<b:02d>
+    .blp`` and is a Cartesian cell: *a* counts rightward, *b* counts upward
+    from the bottom-left, where a lone tile also packs its room. A tile
+    smaller than 256 sits in the bottom-left of its cell. (Checked against
+    every multi-tile group of every registered mine and Ironforge: this
+    layout makes the opaque content as big as the group's MOGI bbox says,
+    the transposed row/col reading does not.)
     """
-    max_row = max(r for r, _ in subtile_fdids)
-    max_col = max(c for _, c in subtile_fdids)
-    canvas = Image.new(
-        "RGBA",
-        ((max_col + 1) * WMO_SUBTILE_PX, (max_row + 1) * WMO_SUBTILE_PX),
-        (0, 0, 0, 0),
-    )
-    for (row, col), fdid in subtile_fdids.items():
+    cols = max(a for a, _ in subtile_fdids) + 1
+    rows = max(b for _, b in subtile_fdids) + 1
+    canvas = Image.new("RGBA", (cols * WMO_SUBTILE_PX, rows * WMO_SUBTILE_PX), (0, 0, 0, 0))
+    rects = {}
+    for (a, b), fdid in subtile_fdids.items():
         sub = Image.open(_cached_path(fdid, WMO_TILE_CACHE_DIR)).convert("RGBA")
-        canvas.paste(sub, (col * WMO_SUBTILE_PX, row * WMO_SUBTILE_PX))
+        x = a * WMO_SUBTILE_PX
+        y = (rows - b) * WMO_SUBTILE_PX - sub.height
+        canvas.paste(sub, (x, y))
+        rects[(a, b)] = (x, y, *sub.size)
+    return canvas, rects
+
+
+def fetch_stitched_tile(subtile_fdids: dict[tuple[int, int], int]) -> Image.Image:
+    """A group's minimap art from more than one raw sub-tile (see
+    :func:`stitch_subtiles`), cropped once to the assembled room's opaque
+    bbox like :func:`fetch_tile`. Cropping each sub-tile first would throw
+    away its position within the room."""
+    canvas, _ = stitch_subtiles(subtile_fdids)
     opaque_bbox = canvas.split()[-1].getbbox()
-    if opaque_bbox:
-        canvas = canvas.crop(opaque_bbox)
-    return canvas
+    return canvas.crop(opaque_bbox) if opaque_bbox else canvas
 
 
 def fetch_group_tile(tile_fdid: "int | dict[tuple[int, int], int]") -> Image.Image:

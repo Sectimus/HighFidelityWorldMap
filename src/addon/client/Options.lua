@@ -45,11 +45,24 @@ local function MapTypeBackgroundValues()
     return values
 end
 
+--- Dropdown order: Config.BACKGROUNDS order (AceConfig would otherwise sort
+--- by label), "Use Global" first where present.
+local function BackgroundSorting(withGlobal)
+    return function()
+        local keys = { withGlobal and "global" or nil }
+        for _, bg in ipairs(Config:AvailableBackgrounds()) do
+            keys[#keys + 1] = bg.key
+        end
+        return keys
+    end
+end
+
 --- True when every Area Labels group is off, which greys out the other label
 --- settings.
 local function NoAreaLabelsOn()
     return not (Config.db.showAreaContinentNames or Config.db.showAreaCapitalCities
-        or Config.db.showAreaTownsHubs or Config.db.showAreaSubzoneNames)
+        or Config.db.showAreaTownsHubs or Config.db.showAreaSubzoneNames
+        or Config.db.showAreaCityDistricts)
 end
 
 local SECTION_RESET = "HFWM-SectionReset"  -- registered below, with the widgets
@@ -71,6 +84,11 @@ local AREA_LABEL_KINDS = {
                       .. "otherwise be obscured." },
     subzone   = { show = "showAreaSubzoneNames", scale = "subzoneAreaLabelScale",
                   color = "subzoneAreaLabel",
+                  fade = "Fades these labels out when the zoom is beyond its "
+                      .. "level, to allow you to see detail that would "
+                      .. "otherwise be obscured." },
+    district  = { show = "showAreaCityDistricts", scale = "districtAreaLabelScale",
+                  auto = "districtAutoScale", color = "districtAreaLabel",
                   fade = "Fades these labels out when the zoom is beyond its "
                       .. "level, to allow you to see detail that would "
                       .. "otherwise be obscured." },
@@ -742,6 +760,7 @@ local options = {
                     name = "Global Background",
                     desc = function() return Config:GetBackground().desc end,
                     values = BackgroundValues,
+                    sorting = BackgroundSorting(false),
                     get = function() return Config:GetBackground().key end,
                     set = function(_, value) Config:SetBackground(value) end,
                 },
@@ -787,19 +806,24 @@ local options = {
                         ns.AreaLabels:Refresh()
                     end,
                 },
-                continentAreaLabels = AreaLabelSection(20, "Continents",
+                districtAreaLabels = AreaLabelSection(12, "City Districts",
+                    AREA_LABEL_KINDS.district,
+                    "Shows the names of the districts inside a capital, such "
+                        .. "as the Mage Quarter, on that city's own map. Click "
+                        .. "the city on the zone map to see them."),
+                continentAreaLabels = AreaLabelSection(23, "Continents",
                     AREA_LABEL_KINDS.continent,
                     "Shows the names of continents, such as Eastern "
                         .. "Kingdoms, on their continent maps."),
-                capitalAreaLabels = AreaLabelSection(21, "Capital Cities",
+                capitalAreaLabels = AreaLabelSection(22, "Capital Cities",
                     AREA_LABEL_KINDS.capital,
                     "Shows the names of capital cities, such as "
                         .. "Stormwind and Ironforge."),
-                townAreaLabels = AreaLabelSection(23, "Towns/Hubs",
+                townAreaLabels = AreaLabelSection(21, "Towns/Hubs",
                     AREA_LABEL_KINDS.town,
                     "Shows the names of towns and hubs, such as "
                         .. "Goldshire and Northshire."),
-                subzoneAreaLabels = AreaLabelSection(25, "Subzones",
+                subzoneAreaLabels = AreaLabelSection(20, "Subzones",
                     AREA_LABEL_KINDS.subzone,
                     "Shows the names of outdoor areas inside a zone, such as "
                         .. "Gol'Bolar Quarry."),
@@ -983,11 +1007,10 @@ local options = {
 -- this one. Replace the filler with real widgets as the right-hand side
 -- fills up; just keep each row's relWidths summing to 0.9-0.99.
 --
--- Display order top to bottom is Zone, World, Continent -- Continent last
--- rather than in Config.MAP_TYPES' own zone/continent/world order, which
--- stays as-is since other code reads it independently of how Options lays
--- these out.
-local MAP_TYPE_ORDER = { zone = 20, world = 30, continent = 40 }
+-- Display order top to bottom is City, Zone, Continent, World -- rather than
+-- in Config.MAP_TYPES' own order, which stays as-is since other code reads it
+-- independently of how Options lays these out.
+local MAP_TYPE_ORDER = { city = 15, zone = 20, continent = 30, world = 40 }
 local mapBackgroundArgs = options.args.mapBackground.args
 for _, mapType in ipairs(Config.MAP_TYPES) do
     local desc = "Which background " .. mapType.label .. " draws with, "
@@ -1001,6 +1024,7 @@ for _, mapType in ipairs(Config.MAP_TYPES) do
         name = mapType.label,
         desc = desc,
         values = MapTypeBackgroundValues,
+        sorting = BackgroundSorting(true),
         get = function() return Config:GetMapTypeBackgroundKey(mapType.key) end,
         set = function(_, value)
             Config:SetMapTypeBackground(mapType.key, value)
@@ -1098,6 +1122,15 @@ mapBackgroundArgs.fogFill = {
     width = "relative",
     relWidth = 0.3,
 }
+-- City Map is a single dropdown row (no Fog of War: cities have no
+-- exploration overlays); pads it so the next control doesn't slide up.
+mapBackgroundArgs.cityFill = {
+    order = MAP_TYPE_ORDER.city + 1,
+    type = "description",
+    name = " ",
+    width = "relative",
+    relWidth = 0.6,
+}
 -- Everything but the Enable toggle (and the intro text) greys out while the
 -- addon is off. `disabled` is inherited, but the deepest definition wins, so
 -- the cave children (which have their own) repeat the check above, and the
@@ -1125,7 +1158,7 @@ local MAIN_PAGE = {
         "keepCentered", "showPlayerCoords", "showMouseCoords",
         "toggleButtonEnabled", "toggleButtonMovable", "toggleButtonPoint",
         "mapBackground", "zoneMapBackground", "continentMapBackground",
-        "worldMapBackground", "worldMapClarity", "continentMapClarity",
+        "worldMapBackground", "cityMapBackground", "worldMapClarity", "continentMapClarity",
         "fogOfWarEnabled", "worldFogOfWar", "continentFogOfWar",
     },
     -- mapFade is a game CVar, not a profile field.
@@ -1391,6 +1424,10 @@ function Options:Init()
         local profiles = LibStub("AceDBOptions-3.0"):GetOptionsTable(
             Config.dbObj)
         profiles.order = 100
+        -- Reset is destructive and AceDBOptions' button has no confirm.
+        profiles.args.reset.confirm = true
+        profiles.args.reset.confirmText = "Reset this profile to its default "
+            .. "settings? Your current settings in it will be lost."
         -- Inline: with no tab/tree child groups AceConfigDialog wraps the
         -- whole page in one ScrollFrame, instead of squeezing a tree
         -- under the settings above.

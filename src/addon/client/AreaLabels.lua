@@ -2,8 +2,9 @@
 -- HFWM-Forever Area Labels
 --
 -- "Area Labels" on the world map: continent names, capital cities, towns and hubs,
--- and subzones, each group toggled from Options (Config.db.showAreaContinentNames,
--- showAreaCapitalCities, showAreaTownsHubs, showAreaSubzoneNames). The names come from
+-- subzones, and city districts, each group toggled from Options
+-- (Config.db.showAreaContinentNames, showAreaCapitalCities, showAreaTownsHubs,
+-- showAreaSubzoneNames, showAreaCityDistricts). The names come from
 -- AreaLabelData.lua, generated from the game's own DB2 tables by
 -- src/generator/scripts/emit_area_labels.py.
 --
@@ -20,7 +21,8 @@ local AreaLabels = ns.AreaLabels
 local WorldMapFrame = _G.WorldMapFrame
 
 -- [uiMapID] = { { name, kind, h, u, v }, ... }, from AreaLabelData.lua. name is
--- the text shown; kind is "continent", "capital", "town" or "subzone", and
+-- the text shown; kind is "continent", "capital", "town", "subzone" or
+-- "district" (a part of a capital, listed only under that capital's own map), and
 -- picks its Options toggle through KIND below; h its height in canvas units at
 -- label scale 1; u/v the centre in 0-1 map coordinates from the top-left.
 local AREA_LABELS = HFWMF_AREA_LABELS or {}
@@ -36,6 +38,8 @@ local KIND = {
                   auto = "townAutoScale", color = "townAreaLabel" },
     subzone   = { show = "showAreaSubzoneNames", scale = "subzoneAreaLabelScale",
                   color = "subzoneAreaLabel" },
+    district  = { show = "showAreaCityDistricts", scale = "districtAreaLabelScale",
+                  auto = "districtAutoScale", color = "districtAreaLabel" },
 }
 
 local FONT = "Fonts\\FRIZQT__.TTF"

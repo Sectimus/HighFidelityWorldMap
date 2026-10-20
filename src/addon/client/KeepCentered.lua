@@ -60,7 +60,8 @@ local function OnUpdate(_, elapsed)
 
     -- Zone maps only; classified once per map, not per frame.
     if mapID ~= checkedMapID then
-        checkedMapID, isZone = mapID, Config:ClassifyMapID(mapID) == "zone"
+        local t = Config:ClassifyMapID(mapID)
+        checkedMapID, isZone = mapID, t == "zone" or t == "city"
         expX, expY = nil, nil
     end
     if not isZone then return end

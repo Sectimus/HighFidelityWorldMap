@@ -349,54 +349,17 @@ local function PoolReleaseAll()
     end
 end
 
---- Draw a baked cave canvas from the client's own WMO group minimap tiles
---- (HFWMF_CAVE_TILES, see scripts/emit_cave_tiles.py) instead of one shipped
---- BLP. Each leaf is a region of a game texture, centred at (cx, cy) in the
---- rotated canvas. The quad is the bounding box of that region once rotated
---- by comp.a, and the eight-value SetTexCoord maps each quad corner back to
---- the point of the source it shows; with CLAMPTOBLACKADDITIVE everything
---- sampled outside the texture is transparent, so the corners vanish.
----@param comp table  { w, h, a, l = { {fdid, srcW, srcH, x0, y0, w, h, cx, cy}, ... } }
----@param scaleX number  canvasScale px per canvas px
----@param scaleY number
----@param offX number  where the canvas's top-left sits in canvasScale
----@param offY number
+--- Config:DrawComposite, onto the cave canvas and its texture pool.
 ---@param sublevel number|nil
 ---@param group table|nil  also collects the textures, as PoolAcquire does
 ---@return table textures  everything drawn, in paint order
 local function DrawComposite(comp, scaleX, scaleY, offX, offY, sublevel, group)
-    local rad = math.rad(comp.a)
-    local c, s = math.cos(rad), math.sin(rad)
-    local ac, as = math.abs(c), math.abs(s)
-    local drawn = {}
-    for _, leaf in ipairs(comp.l) do
-        local fdid, sw, sh, x0, y0, w, h, cx, cy, dw, dh = unpack(leaf)
-        -- The quad is the bounding box of the dw x dh rect once rotated; the
-        -- region w x h is stretched over it (kx, ky), so a room can grow to
-        -- meet its neighbour.
-        local kx, ky = w / dw, h / dh
-        local hx, hy = (dw * ac + dh * as) / 2, (dw * as + dh * ac) / 2
-        local mx, my = x0 + w / 2, y0 + h / 2
-        -- Quad corner at offset (dx, dy) from the leaf centre -> source UV.
-        local function uv(dx, dy)
-            return (mx + (dx * c - dy * s) * kx) / sw,
-                   (my + (dx * s + dy * c) * ky) / sh
-        end
-        local ulx, uly = uv(-hx, -hy)
-        local llx, lly = uv(-hx,  hy)
-        local urx, ury = uv( hx, -hy)
-        local lrx, lry = uv( hx,  hy)
-
-        local tex = PoolAcquire(group)
-        tex:SetDrawLayer("ARTWORK", sublevel or 3)
-        tex:SetSize(2 * hx * scaleX, 2 * hy * scaleY)
-        tex:SetPoint("TOPLEFT", canvasScale, "TOPLEFT",
-            offX + (cx - hx) * scaleX, -(offY + (cy - hy) * scaleY))
-        tex:SetTexCoord(ulx, uly, llx, lly, urx, ury, lrx, lry)
-        tex:SetTexture(fdid, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
-        drawn[#drawn + 1] = tex
-    end
-    return drawn
+    return Config:DrawComposite(comp, canvasScale, scaleX, scaleY, offX, offY,
+        function()
+            local tex = PoolAcquire(group)
+            tex:SetDrawLayer("ARTWORK", sublevel or 3)
+            return tex
+        end)
 end
 
 -------------------------------------------------------------------------------
