@@ -106,11 +106,17 @@ def mine_entries(spec):
     yield from mine_bake(spec)[1]
 
 
-def layer_leaves(leaves, angle):
-    """*leaves* (painted low to high) with a 12th value: the ARTWORK sublevel
-    (0..15, minus 8 in game) to draw each on. The game leaves the paint order
-    of textures on the same sublevel undefined, so each leaf sits one sublevel
-    above the highest leaf it overlaps; leaves that don't overlap share one."""
+# Floors this many yards apart are different levels of a building, not one.
+LEVEL_GAP = 3
+
+
+def layer_leaves(leaves, zs, angle):
+    """*leaves* (painted low to high, *zs* their floor heights) with a 12th
+    value: the ARTWORK sublevel (0..15, minus 8 in game) to draw each on. The
+    game leaves the paint order of textures on the same sublevel undefined, so
+    each leaf sits one sublevel above the highest leaf it overlaps that has a
+    floor more than LEVEL_GAP yards lower. Leaves at one level (street-level
+    pieces differ by tenths of a yard) or not overlapping share a sublevel."""
     ac, as_ = abs(math.cos(math.radians(angle))), abs(math.sin(math.radians(angle)))
     boxes = []
     for leaf in leaves:
@@ -122,7 +128,8 @@ def layer_leaves(leaves, angle):
         sub = 0
         for j in range(i):
             l2, r2, t2, b2 = boxes[j]
-            if min(r, r2) - max(l, l2) > 2 and min(b, b2) - max(t, t2) > 2:
+            if (zs[i] - zs[j] > LEVEL_GAP and min(r, r2) - max(l, l2) > 2
+                    and min(b, b2) - max(t, t2) > 2):
                 sub = max(sub, subs[j] + 1)
         subs.append(sub)
     if subs and max(subs) > 15:
@@ -210,7 +217,8 @@ def mine_bake(spec):
         # group's bottom), not its mid-height: a tall cavern whose floor is
         # far down must not cover the small rooms standing in it.
         ordered = sorted(floors[name], key=lambda idx: (by_index[idx].bbox[2], -by_index[idx].bbox[5], idx))
-        leaves = layer_leaves([leaf for idx in ordered for leaf in placed(idx)], angle)
+        placed_z = [(by_index[idx].bbox[2], leaf) for idx in ordered for leaf in placed(idx)]
+        leaves = layer_leaves([leaf for _, leaf in placed_z], [z for z, _ in placed_z], angle)
         entries.append((spec.floor_fdid_base + i,
                         {"w": w1, "h": h1, "a": angle, "l": leaves}))
     for order, idx in enumerate(tiled):
