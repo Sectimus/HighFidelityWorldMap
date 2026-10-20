@@ -42,7 +42,11 @@ local KIND = {
                   auto = "districtAutoScale", color = "districtAreaLabel" },
 }
 
-local FONT = "Fonts\\FRIZQT__.TTF"
+--- The font a label kind draws in: its own, or the Global Font.
+local function FontFor(key)
+    local font = Config.db[key .. "Font"]
+    return font == "global" and Config.db.areaLabelFont or font
+end
 -- Font height per unit of label h. Matches the text size of the art the
 -- labels were drawn at before; approximate, tune in game.
 local FONT_PER_H = 0.85
@@ -142,7 +146,8 @@ local function Paint(l, label, x, y, scale, opaque)
     end
 
     local first = l.bands[1].fs
-    first:SetFont(FONT, size, "")
+    local font = FontFor(key)
+    first:SetFont(font, size, "")
     first:SetText(label.name)
     local w, h = first:GetStringWidth(), first:GetStringHeight()
     l.holder:SetSize(w, h)
@@ -153,7 +158,7 @@ local function Paint(l, label, x, y, scale, opaque)
 
     local bw = size * BORDER_RATIO
     for i, fs in ipairs(l.outline) do
-        fs:SetFont(FONT, size, "")
+        fs:SetFont(font, size, "")
         fs:SetText(label.name)
         fs:SetTextColor(o[1], o[2], o[3], 1)
         fs:ClearAllPoints()
@@ -188,7 +193,7 @@ local function Paint(l, label, x, y, scale, opaque)
             band.clip:ClearAllPoints()
             band.clip:SetPoint("TOPLEFT", l.holder, "TOPLEFT", -pad, up - top)
             band.clip:Show()
-            band.fs:SetFont(FONT, size, "")
+            band.fs:SetFont(font, size, "")
             band.fs:SetText(inline or label.name)
             if inline then
                 band.fs:SetTextColor(1, 1, 1, 1)

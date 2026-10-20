@@ -219,6 +219,23 @@ Config.DEFAULTS = {
     -- "Show on SD" (Options): labels stay fully visible across the whole HD/SD
     -- blend, not just its HD half. See AreaLabels' AreaLabelAlpha.
     areaLabelShowOnSD = false,
+    -- Label fonts (AreaLabels.lua's Paint): a font file path from
+    -- Config.AREA_LABEL_FONTS. areaLabelFont is the Global Font; each type's
+    -- <color>Font is a path of its own, or "global" to follow the Global Font.
+    areaLabelFont = "Fonts\\FRIZQT__.TTF",
+    continentAreaLabelFont = "global",
+    capitalAreaLabelFont = "global",
+    townAreaLabelFont = "global",
+    subzoneAreaLabelFont = "global",
+}
+
+--- Fonts the Area Labels can use, in dropdown order. Blizzard ships these
+--- with every client (the game swaps in a locale font where it must).
+Config.AREA_LABEL_FONTS = {
+    { path = "Fonts\\FRIZQT__.TTF", label = "Friz Quadrata" },
+    { path = "Fonts\\ARIALN.TTF",   label = "Arial Narrow" },
+    { path = "Fonts\\MORPHEUS.TTF", label = "Morpheus" },
+    { path = "Fonts\\SKURRI.TTF",   label = "Skurri" },
 }
 -- The db also carries `caveWindowPoint` -- { left, top }, the window's
 -- TOPLEFT in UIParent units -- written by CaveRenderer when the window is

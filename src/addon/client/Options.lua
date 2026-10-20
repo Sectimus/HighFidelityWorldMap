@@ -57,6 +57,21 @@ local function BackgroundSorting(withGlobal)
     end
 end
 
+--- Area Label font dropdown values: the fonts in Config.AREA_LABEL_FONTS in
+--- order, with "Use Global" (Blizzard cyan) first when *withGlobal* is set.
+local function FontValues(withGlobal)
+    local values, sorting = {}, {}
+    if withGlobal then
+        values.global = BLIZZARD_CYAN_HEX .. "Use Global|r"
+        sorting[1] = "global"
+    end
+    for _, f in ipairs(Config.AREA_LABEL_FONTS) do
+        values[f.path] = f.label
+        sorting[#sorting + 1] = f.path
+    end
+    return values, sorting
+end
+
 --- True when every Area Labels group is off, which greys out the other label
 --- settings.
 local function NoAreaLabelsOn()
@@ -98,7 +113,7 @@ local AREA_LABEL_KINDS = {
 local function AreaLabelKeys(k)
     local keys = { k.show, k.scale }
     if k.auto then keys[#keys + 1] = k.auto end
-    for _, suffix in ipairs({ "ColorMode", "Color", "Color2", "GradientDir", "Outline" }) do
+    for _, suffix in ipairs({ "ColorMode", "Color", "Color2", "GradientDir", "Outline", "Font" }) do
         keys[#keys + 1] = k.color .. suffix
     end
     if k.fade then
@@ -110,7 +125,7 @@ local function AreaLabelKeys(k)
 end
 
 -- What the Area Labels page's Reset to Defaults restores.
-local AREA_LABEL_PAGE_KEYS = { "areaLabelScale", "areaLabelShowOnSD" }
+local AREA_LABEL_PAGE_KEYS = { "areaLabelScale", "areaLabelShowOnSD", "areaLabelFont" }
 for _, k in pairs(AREA_LABEL_KINDS) do
     for _, key in ipairs(AreaLabelKeys(k)) do AREA_LABEL_PAGE_KEYS[#AREA_LABEL_PAGE_KEYS + 1] = key end
 end
@@ -289,6 +304,19 @@ local function AreaLabelSection(order, title, k, desc)
                 get = function() return Config.db[scaleKey] / Config.DEFAULTS[scaleKey] end,
                 set = function(_, value)
                     Config.db[scaleKey] = value * Config.DEFAULTS[scaleKey]
+                    ns.AreaLabels:Refresh()
+                end,
+            },
+            font = {
+                order = 25,
+                type = "select",
+                name = "Font",
+                values = FontValues(true),
+                sorting = select(2, FontValues(true)),
+                hidden = function() return not Config.db[showKey] end,
+                get = function() return Config.db[colorKey .. "Font"] end,
+                set = function(_, value)
+                    Config.db[colorKey .. "Font"] = value
                     ns.AreaLabels:Refresh()
                 end,
             },
@@ -811,6 +839,21 @@ local options = {
                     "Shows the names of the districts inside a capital, such "
                         .. "as the Mage Quarter, on that city's own map. Click "
                         .. "the city on the zone map to see them."),
+                areaLabelFont = {
+                    order = 13,
+                    type = "select",
+                    name = "Global Font",
+                    desc = "Font of every map label whose own Font is "
+                        .. "\"Use Global\".",
+                    values = FontValues(false),
+                    sorting = select(2, FontValues(false)),
+                    disabled = NoAreaLabelsOn,
+                    get = function() return Config.db.areaLabelFont end,
+                    set = function(_, value)
+                        Config.db.areaLabelFont = value
+                        ns.AreaLabels:Refresh()
+                    end,
+                },
                 continentAreaLabels = AreaLabelSection(23, "Continents",
                     AREA_LABEL_KINDS.continent,
                     "Shows the names of continents, such as Eastern "
