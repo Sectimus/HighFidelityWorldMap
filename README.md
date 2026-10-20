@@ -69,7 +69,7 @@ The **Instance map (beta)** section's **Dungeon** and **Raid** toggles control t
 
 ## Area Labels
 
-Area names optionally drawn over the map, in four zoom levels, each with its own configurable settings.
+Area names optionally drawn over the map, in five types (including city districts, such as Stormwind's Mage Quarter, on each capital's own map), each with its own configurable settings.
 Also supports fog of war exploration. Explore and unlock labelled areas of your map as you progress.
 
 ![Area Labels](https://i.postimg.cc/90pqTN40/area-labels-gif.gif)
@@ -173,6 +173,8 @@ python src/generator/scripts/emit_cave_tiles.py
 ```
 
 `IndoorData.lua` and `IndoorTiles.lua` (every other indoor area: houses, inns, towers, unnamed caves; about 1.2 MB together) come from `python src/generator/scripts/emit_indoors.py`. It finds every placed WMO with baked minimap art in the Eastern Kingdoms and Kalimdor object files (`hfwm/caves/indoors.py`, using the community listfile, downloaded once into the cache, about 150 MB) and bakes each like a mine; a couple of minutes once the files are cached. The addon only uses them while **Other indoors** is on.
+
+`AreaLabelData.lua` (every Area Labels name and position, city districts included) comes from `python src/generator/scripts/emit_area_labels.py`. Districts are read from the game's own tables: a capital's AreaTable sub-areas placed by their terrain chunks, and the names `WMOAreaTable` gives the city's WMO groups placed by their MODF position, so a client update only needs this script re-run after bumping `GAME_BUILD`. It reuses the Fog of War terrain cache and the indoor pass's WMO cache; the group IDs it needs are cached in `wmo_group_ids.json`.
 
 Two more tables are not part of the full run; both feed the World/Continent Fog of War checkbox. `ZoneOverlays.lua` (how many exploration overlays each zone has) comes from `python src/generator/scripts/emit_zone_overlays.py`, which downloads three small DB2 tables. `ZoneShapes.lua` and `src/addon/client/ZoneMasks/` (one smoothed outline mask per zone, 6 MB, not committed — CI builds both at release time) come from `python src/generator/scripts/emit_zone_shapes.py`. It reads the area ID of every terrain chunk from the game's ADT files (about 1,700 downloads, a couple of minutes, cached as 512 bytes each), so the borders are the game's own and follow the stitched art. The masks sit outside `WorldMap/` so regenerating that folder never touches them.
 

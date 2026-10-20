@@ -1,11 +1,12 @@
 """Emit AreaLabelData.lua: the names the world map labels, per UiMap.
 
-Four kinds, all from this build's own DB2 exports (see hfwm.config.endpoints):
+Five kinds, all from this build's own DB2 exports (see hfwm.config.endpoints):
 
   continent  UiMap rows of Type 2, placed at the centre of the art.
   capital    AreaPOI rows with Flags 29 (see CAPITAL_FLAGS).
   town       AreaPOI rows with Flags 5 (see TOWN_FLAGS).
   subzone    WorldMapOverlay rects of outdoor areas (AreaTable ParentAreaID != 0).
+  district   the named parts of a capital, on that capital's own map (below).
 
 A town or capital is placed on the zone map its name resolves to through
 WorldMapOverlay (AreaTable name -> overlay art -> UiMap), at the POI's world
@@ -13,26 +14,49 @@ position mapped through that map's UiMapAssignment Region_* bounds. A subzone
 is placed at the centre of its own overlay rect. Names that do not resolve are
 listed and skipped, not guessed.
 
+A district is a part of a capital's own map (Stormwind City, not Elwynn
+Forest): an AreaTable area under the city, placed at the centre of its
+terrain chunks, or a name WMOAreaTable gives groups of the city's WMO
+(Mage Quarter, Valley of Wisdom, Magic Quarter), placed at the centre of
+those groups. WMOAreaTable names buildings and rooms the same way, so a
+WMO name is kept only when its footprint is a real share of the city map
+(MIN_DISTRICT_SHARE).
+
 Each labelled area also gets an ``overlay`` key: its WorldMapOverlay row's
 OffsetX,OffsetY,TextureWidth,TextureHeight. C_MapExplorationInfo reports an
 explored texture with those same four numbers, so AreaLabels can tell whether
 that exact area is explored under Fog of War.
 """
 
+import json
+import math
+import struct
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from urllib.request import Request, urlopen
+
+import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from hfwm.config.build import GAME_BUILD  # noqa: E402
-from hfwm.config.paths import AREA_LABEL_DATA_FILE  # noqa: E402
+from emit_zone_shapes import CHUNK, terrain_areas, tiles_needed  # noqa: E402
+from hfwm.caves.indoors import _present_all, _read_listfile  # noqa: E402
+from hfwm.caves.indoors import WORLD_MAPS  # noqa: E402
+from hfwm.caves.wmo import iter_modf_placements, parse_wmo_groups  # noqa: E402
+from hfwm.config.build import GAME_BUILD, USER_AGENT  # noqa: E402
+from hfwm.config.endpoints import WAGO_CASC_PINNED_FMT  # noqa: E402
+from hfwm.config.paths import (  # noqa: E402
+    AREA_LABEL_DATA_FILE, CACHE_ROOT, WMO_CACHE_DIR)
 from hfwm.config.tiles import (  # noqa: E402
     EXPECTED_ART_LAYER_DIMS,
+    TILE_WORLD_SIZE,
     UI_MAP_TYPE_CONTINENT,
     UI_MAP_TYPE_ZONE,
 )
 from hfwm.gamedata.tables import fetch_pinned_table  # noqa: E402
+from hfwm.infra.http import download_casc_cached  # noqa: E402
 from hfwm.lua.literals import lua_string  # noqa: E402
 
 # Overlay hit rects are in the art layer's own pixel space.
@@ -45,7 +69,8 @@ TOWN_FLAGS = "5"
 # Label height in canvas units at scale 1, per kind. The hand-tuned values
 # these replace ranged 11.5-19.5 for towns and capitals and 21-26.5 for
 # continents; one value per kind is the simplification. Tune in game.
-AREA_LABEL_H = {"continent": 24, "capital": 16, "town": 12, "subzone": 10}
+AREA_LABEL_H = {"continent": 24, "capital": 16, "town": 12, "subzone": 10,
+                "district": 12}
 
 # AreaPOI name -> AreaTable name, where they differ.
 ALIASES = {
@@ -53,7 +78,16 @@ ALIASES = {
     "The Undercity": "Undercity",
 }
 
-KIND_ORDER = {"continent": 0, "capital": 1, "town": 2, "subzone": 3}
+KIND_ORDER = {"continent": 0, "capital": 1, "town": 2, "subzone": 3, "district": 4}
+
+# A WMO name is a district, not a building or a room, when its groups' bounding
+# box covers this share of the city map. Stormwind's smallest district (Old
+# Town) is 5%, its largest building (the Keep) 2%; Ironforge's halls and
+# Library, which are not districts, still pass. ponytail: one cut-off for
+# every city; raise it if halls show up, lower it if a district goes missing.
+MIN_DISTRICT_SHARE = 0.03
+
+GROUP_ID_CACHE = CACHE_ROOT / "wmo_group_ids.json"
 
 
 def _f(row, key):
@@ -100,6 +134,106 @@ def _overlay_key(row):
     """The explored-texture key of a WorldMapOverlay row, as Lua writes it."""
     return ",".join(str(_i(row, c)) for c in
                     ("OffsetX", "OffsetY", "TextureWidth", "TextureHeight"))
+
+
+# Where a WMO group's groupID sits in its file: the MVER chunk (12 bytes), the
+# MOGP chunk header (8), then the field's offset in the MOGP header (0x38).
+GROUP_ID_AT = 12 + 8 + 0x38
+
+
+def _read_group_id(fdid):
+    """MOGP groupID of one WMO group file, or None if the build lacks it. It
+    is in the first bytes, so only those are read."""
+    request = Request(WAGO_CASC_PINNED_FMT.format(fdid=fdid),
+                      headers={"User-Agent": USER_AGENT})
+    with urlopen(request, timeout=30) as resp:
+        head = resp.read(GROUP_ID_AT + 4)
+    if len(head) < GROUP_ID_AT + 4:
+        return None
+    assert head[12:16] == b"PGOM", f"{fdid} is not a WMO group file"
+    return struct.unpack_from("<I", head, GROUP_ID_AT)[0]
+
+
+def _group_indices(wmo_path, count, fdid_of_path, cache):
+    """{WMOGroupID: group index} of a WMO. WMOAreaTable names a group by the
+    groupID in its file, which is not its index in the root file."""
+    fdids = {i: fdid_of_path.get(f"{wmo_path}_{i:03d}") for i in range(count)}
+    todo = [f for f in fdids.values() if f and str(f) not in cache]
+    with ThreadPoolExecutor(16) as pool:
+        cache.update(zip(map(str, todo), pool.map(_read_group_id, todo)))
+    return {cache[str(f)]: i for i, f in fdids.items()
+            if f and cache.get(str(f)) is not None}
+
+
+def _world_corners(placement, bbox):
+    """World (x, y) of a WMO group's four bounding-box corners, placed as
+    emit_indoors.world_bounds does."""
+    yaw = math.radians(placement.rotation[1])
+    base_x = 32 * TILE_WORLD_SIZE - placement.position[2]
+    base_y = 32 * TILE_WORLD_SIZE - placement.position[0]
+    x1, y1, _, x2, y2, _ = bbox
+    return [(base_x + (-lx * math.cos(yaw) + ly * math.sin(yaw)),
+             base_y - (lx * math.sin(yaw) + ly * math.cos(yaw)))
+            for lx in (x1, x2) for ly in (y1, y2)]
+
+
+def _wmo_footprints(cities, named):
+    """{city uiMapID: {name: [(x, y), ...]}}: the world corners of every group
+    that WMOAreaTable names, in each WMO placed inside a city's region.
+    *cities*: uiMapID -> (Map.ID, region); *named*: WMOID -> [(NameSetID,
+    WMOGroupID, name)]. A WMOID is the number its file is named by."""
+    adts, wmo_paths, _ = _read_listfile()
+    wmoid_of = {}
+    for fdid, path in wmo_paths.items():
+        stem = path.rpartition("/")[2]
+        if stem.isdigit() and int(stem) in named:
+            wmoid_of[fdid] = int(stem)
+    fdid_of_path = {p: f for f, p in wmo_paths.items()}
+    cache = (json.loads(GROUP_ID_CACHE.read_text())
+             if GROUP_ID_CACHE.exists() else {})
+
+    out = {uid: {} for uid in cities}
+    seen = set()  # a WMO on a tile edge is listed by both tiles
+    for adt in sorted(_present_all(adts, WMO_CACHE_DIR)):
+        data = (WMO_CACHE_DIR / f"{adt}.blp").read_bytes()
+        for fdid, placement in iter_modf_placements(data):
+            if fdid not in wmoid_of or placement.unique_id in seen:
+                continue
+            x = 32 * TILE_WORLD_SIZE - placement.position[2]
+            y = 32 * TILE_WORLD_SIZE - placement.position[0]
+            city = next((uid for uid, (map_id, region) in cities.items()
+                         if map_id == WORLD_MAPS[adts[adt]]
+                         and _contains(region, x, y)), None)
+            if city is None:
+                continue
+            seen.add(placement.unique_id)
+            root = download_casc_cached(fdid, WMO_CACHE_DIR, pinned=True)
+            groups = parse_wmo_groups(root.read_bytes(), {})
+            index_of = _group_indices(wmo_paths[fdid], len(groups),
+                                      fdid_of_path, cache)
+            for name_set, group_id, name in named[wmoid_of[fdid]]:
+                i = index_of.get(group_id)
+                if name_set == placement.name_set and i is not None:
+                    out[city].setdefault(name, []).extend(
+                        _world_corners(placement, groups[i].bbox))
+    GROUP_ID_CACHE.write_text(json.dumps(cache))
+    return out
+
+
+def _terrain_centres(grid, region, wanted):
+    """{AreaID: (x, y)}: the centre of each wanted area's terrain chunks inside
+    *region*. *grid* is terrain_areas' one-AreaID-per-chunk array."""
+    x0, y0, x1, y1 = region
+    r0, r1 = (math.floor(32 * 16 - x / CHUNK) for x in (x1, x0))
+    c0, c1 = (math.floor(32 * 16 - y / CHUNK) for y in (y1, y0))
+    sub = grid[r0:r1 + 1, c0:c1 + 1]
+    out = {}
+    for aid in wanted:
+        rows, cols = np.nonzero(sub == aid)
+        if len(rows):
+            out[aid] = ((32 * 16 - (rows.mean() + r0 + 0.5)) * CHUNK,
+                        (32 * 16 - (cols.mean() + c0 + 0.5)) * CHUNK)
+    return out
 
 
 def main():
@@ -223,6 +357,77 @@ def main():
             "name": name, "kind": "subzone", "u": u, "v": v,
             "overlay": overlay_key[(uid, aid)][1],
         })
+
+    # ---- city districts -----------------------------------------------------
+    # The capitals' own maps: the zone map each capital's AreaTable row owns.
+    owner = {_i(r, "AreaID"): r for r in assignments
+             if _i(r, "AreaID") and is_zone(_i(r, "UiMapID"))}
+    cities = {}  # city uiMapID -> (assignment row, the city's AreaID)
+    for poi in areapoi:
+        if poi["Flags"] != CAPITAL_FLAGS:
+            continue
+        for a in names_to_area.get(ALIASES.get(poi["Name_lang"], poi["Name_lang"]), []):
+            asg = owner.get(_i(a, "ID"))
+            if asg:
+                cities[_i(asg, "UiMapID")] = (asg, _i(a, "ID"))
+    regions = {uid: _region(asg) for uid, (asg, _) in cities.items()}
+
+    def under(aid, root):
+        for _ in range(8):
+            if aid == root:
+                return True
+            aid = _i(areas_by_id.get(aid, {}), "ParentAreaID")
+            if not aid:
+                return False
+        return False
+
+    wmo_names = {}  # WMOID -> [(NameSetID, WMOGroupID, name)]; group -1 is the root
+    for r in fetch_pinned_table("WMOAreaTable"):
+        if r["AreaName_lang"] and _i(r, "WMOGroupID") >= 0:
+            wmo_names.setdefault(_i(r, "WMOID"), []).append(
+                (_i(r, "NameSetID"), _i(r, "WMOGroupID"), r["AreaName_lang"]))
+    footprints = _wmo_footprints(
+        {uid: (_i(asg, "MapID"), regions[uid]) for uid, (asg, _) in cities.items()},
+        wmo_names)
+    grids = terrain_areas(tiles_needed({
+        uid: [dict(map_id=_i(asg, "MapID"), top=regions[uid][2],
+                   bottom=regions[uid][0], left=regions[uid][3],
+                   right=regions[uid][1])]
+        for uid, (asg, _) in cities.items()}))
+
+    for uid, (asg, city_aid) in sorted(cities.items()):
+        region = regions[uid]
+        x0, y0, x1, y1 = region
+        found = {}  # casefolded name -> (name, x, y)
+        # Terrain: AreaTable areas under the city.
+        under_city = [a for a in areatable
+                      if _i(a, "ID") != city_aid and under(_i(a, "ID"), city_aid)]
+        centres = _terrain_centres(grids[_i(asg, "MapID")], region,
+                                   {_i(a, "ID") for a in under_city})
+        for a in under_city:
+            if a["AreaName_lang"] and _i(a, "ID") in centres:
+                found.setdefault(a["AreaName_lang"].casefold(),
+                                 (a["AreaName_lang"], *centres[_i(a, "ID")]))
+        # WMO groups. A name that is another zone's area (Undercity's "Ruins
+        # of Lordaeron"), the city's own, or lower-case debug text is not one.
+        city_name = areas_by_id[city_aid]["AreaName_lang"]
+        for name, pts in footprints[uid].items():
+            xs, ys = zip(*pts)
+            share = (max(xs) - min(xs)) * (max(ys) - min(ys)) / ((x1 - x0) * (y1 - y0))
+            areas = names_to_area.get(name, [])
+            if (not name[:1].isupper() or name.casefold() == city_name.casefold()
+                    or share < MIN_DISTRICT_SHARE
+                    or (areas and not any(under(_i(r, "ID"), city_aid) for r in areas))):
+                continue
+            found.setdefault(name.casefold(),
+                             (name, sum(xs) / len(xs), sum(ys) / len(ys)))
+        for name, x, y in found.values():
+            if _contains(region, x, y):
+                u, v = _uv(region, x, y)
+                out.setdefault(uid, []).append(
+                    {"name": name, "kind": "district", "u": u, "v": v})
+        print(f"  {uimap[uid]['Name_lang']}: "
+              + ", ".join(sorted(n for n, _, _ in found.values())))
 
     _write(out)
     counts = {}

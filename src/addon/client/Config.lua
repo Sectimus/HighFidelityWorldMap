@@ -131,12 +131,14 @@ Config.DEFAULTS = {
     showPlayerCoords = true,
     showMouseCoords  = true,
 
-    -- Area Labels (AreaLabels.lua): names drawn on the map over its art, in four
-    -- groups: continent names, capital cities, towns and hubs, and subzones.
+    -- Area Labels (AreaLabels.lua): names drawn on the map over its art, in five
+    -- groups: continent names, capital cities, towns and hubs, subzones, and
+    -- city districts (only on a capital's own map).
     showAreaContinentNames = false,
     showAreaCapitalCities = true,
     showAreaTownsHubs = true,
     showAreaSubzoneNames = true,
+    showAreaCityDistricts = true,
     -- Global label scale: multiplier (1..4) on every label. Options shows it
     -- halved, so the default 2 reads as 100%. Multiplies each type's own
     -- scale below. See AreaLabels.lua's AreaLabelScale.
@@ -147,12 +149,14 @@ Config.DEFAULTS = {
     capitalAreaLabelScale = 1.15,
     townAreaLabelScale = 1.3,
     subzoneAreaLabelScale = 0.18,
+    districtAreaLabelScale = 0.8,
     -- Auto-scale per label type: labels grow as you zoom out and shrink as you
     -- zoom in, from their label scale at the loosest zoom step. See
     -- AreaLabels.lua's AreaLabelScale.
     continentAutoScale = false,
     capitalAutoScale = false,
     townAutoScale = false,
+    districtAutoScale = false,
     -- Per-type label colour: Mode is "solid" (Color) or "gradient" (Color to
     -- Color2, along GradientDir: "HORIZONTAL" left to right, "VERTICAL" top
     -- to bottom). {r, g, b} 0..1. The default Color is the gold the labels
@@ -173,12 +177,17 @@ Config.DEFAULTS = {
     subzoneAreaLabelColor = { 1, 247 / 255, 227 / 255 },
     subzoneAreaLabelColor2 = { 1, 200 / 255, 90 / 255 },
     subzoneAreaLabelGradientDir = "VERTICAL",
+    districtAreaLabelColorMode = "solid",
+    districtAreaLabelColor = { 1, 247 / 255, 227 / 255 },
+    districtAreaLabelColor2 = { 1, 200 / 255, 90 / 255 },
+    districtAreaLabelGradientDir = "VERTICAL",
     -- Border per type: copies of the text in the Outline colour, BORDER_RATIO of
     -- the font size out (see AreaLabels.lua's Paint).
     continentAreaLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
     capitalAreaLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
     townAreaLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
     subzoneAreaLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
+    districtAreaLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
     -- Fade when zoomed, per type. Two zoom ladder steps (0 furthest out, 11
     -- the most zoomed in) bound the fade: FadeVisibleAt is where the label is
     -- fully shown, FadeInvisibleAt where it is fully hidden. Speed sets how
@@ -201,6 +210,12 @@ Config.DEFAULTS = {
     subzoneAreaLabelFadeInvisibleAt = 3,
     subzoneAreaLabelFadeInSpeed = 1,
     subzoneAreaLabelFadeOutSpeed = 1,
+    -- Districts fade out like capitals and towns, but start off: they always show.
+    districtAreaLabelZoomFade = false,
+    districtAreaLabelFadeVisibleAt = 0,
+    districtAreaLabelFadeInvisibleAt = 3,
+    districtAreaLabelFadeInSpeed = 1,
+    districtAreaLabelFadeOutSpeed = 1,
     -- "Show on SD" (Options): labels stay fully visible across the whole HD/SD
     -- blend, not just its HD half. See AreaLabels' AreaLabelAlpha.
     areaLabelShowOnSD = false,

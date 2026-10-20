@@ -61,7 +61,8 @@ end
 --- settings.
 local function NoAreaLabelsOn()
     return not (Config.db.showAreaContinentNames or Config.db.showAreaCapitalCities
-        or Config.db.showAreaTownsHubs or Config.db.showAreaSubzoneNames)
+        or Config.db.showAreaTownsHubs or Config.db.showAreaSubzoneNames
+        or Config.db.showAreaCityDistricts)
 end
 
 local SECTION_RESET = "HFWM-SectionReset"  -- registered below, with the widgets
@@ -83,6 +84,11 @@ local AREA_LABEL_KINDS = {
                       .. "otherwise be obscured." },
     subzone   = { show = "showAreaSubzoneNames", scale = "subzoneAreaLabelScale",
                   color = "subzoneAreaLabel",
+                  fade = "Fades these labels out when the zoom is beyond its "
+                      .. "level, to allow you to see detail that would "
+                      .. "otherwise be obscured." },
+    district  = { show = "showAreaCityDistricts", scale = "districtAreaLabelScale",
+                  auto = "districtAutoScale", color = "districtAreaLabel",
                   fade = "Fades these labels out when the zoom is beyond its "
                       .. "level, to allow you to see detail that would "
                       .. "otherwise be obscured." },
@@ -800,19 +806,24 @@ local options = {
                         ns.AreaLabels:Refresh()
                     end,
                 },
-                continentAreaLabels = AreaLabelSection(20, "Continents",
+                districtAreaLabels = AreaLabelSection(12, "City Districts",
+                    AREA_LABEL_KINDS.district,
+                    "Shows the names of the districts inside a capital, such "
+                        .. "as the Mage Quarter, on that city's own map. Click "
+                        .. "the city on the zone map to see them."),
+                continentAreaLabels = AreaLabelSection(23, "Continents",
                     AREA_LABEL_KINDS.continent,
                     "Shows the names of continents, such as Eastern "
                         .. "Kingdoms, on their continent maps."),
-                capitalAreaLabels = AreaLabelSection(21, "Capital Cities",
+                capitalAreaLabels = AreaLabelSection(22, "Capital Cities",
                     AREA_LABEL_KINDS.capital,
                     "Shows the names of capital cities, such as "
                         .. "Stormwind and Ironforge."),
-                townAreaLabels = AreaLabelSection(23, "Towns/Hubs",
+                townAreaLabels = AreaLabelSection(21, "Towns/Hubs",
                     AREA_LABEL_KINDS.town,
                     "Shows the names of towns and hubs, such as "
                         .. "Goldshire and Northshire."),
-                subzoneAreaLabels = AreaLabelSection(25, "Subzones",
+                subzoneAreaLabels = AreaLabelSection(20, "Subzones",
                     AREA_LABEL_KINDS.subzone,
                     "Shows the names of outdoor areas inside a zone, such as "
                         .. "Gol'Bolar Quarry."),
