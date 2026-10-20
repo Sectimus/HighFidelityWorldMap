@@ -20,7 +20,7 @@ Config.DEFAULTS = {
     zoneMapBackground       = "global",
     continentMapBackground  = "global",
     worldMapBackground      = "global",
-    cityMapBackground       = "global",
+    cityMapBackground       = "blackout",
 
     -- Cave map: a window that opens over the world map when the player is
     -- somewhere the map above it has nothing to show (caves, mines, micro
@@ -210,8 +210,8 @@ Config.DEFAULTS = {
     subzoneAreaLabelFadeInvisibleAt = 3,
     subzoneAreaLabelFadeInSpeed = 1,
     subzoneAreaLabelFadeOutSpeed = 1,
-    -- Districts fade out like capitals and towns, but start off: they always show.
-    districtAreaLabelZoomFade = false,
+    -- Districts fade out like capitals and towns, on by default.
+    districtAreaLabelZoomFade = true,
     districtAreaLabelFadeVisibleAt = 0,
     districtAreaLabelFadeInvisibleAt = 3,
     districtAreaLabelFadeInSpeed = 1,
@@ -625,13 +625,13 @@ end
 --- eight-value SetTexCoord maps each quad corner back to the point of the
 --- source it shows; with CLAMPTOBLACKADDITIVE everything sampled outside the
 --- texture is transparent, so the corners vanish.
----@param comp table  { w, h, a, l = { {fdid, srcW, srcH, x0, y0, w, h, cx, cy, dw, dh}, ... } }
+---@param comp table  { w, h, a, l = { {fdid, srcW, srcH, x0, y0, w, h, cx, cy, dw, dh, sub}, ... } }
 ---@param parent table  frame the quads are anchored to
 ---@param scaleX number  parent px per canvas px
 ---@param scaleY number
 ---@param offX number  where the canvas's top-left sits in parent
 ---@param offY number
----@param acquire function  returns a fresh texture, already on `parent`
+---@param acquire function  (sub) returns a fresh texture, already on `parent`; sub is the leaf's 0..15 layer, or nil, for the caller to put on ARTWORK sublevel sub - 8 (the game leaves same-sublevel paint order undefined)
 ---@param clip table|nil  { x0, y0, x1, y1 } canvas box; art outside it is cut
 ---@return table textures  everything drawn, in paint order
 function Config:DrawComposite(comp, parent, scaleX, scaleY, offX, offY, acquire, clip)
@@ -640,7 +640,7 @@ function Config:DrawComposite(comp, parent, scaleX, scaleY, offX, offY, acquire,
     local ac, as = math.abs(c), math.abs(s)
     local drawn = {}
     for _, leaf in ipairs(comp.l) do
-        local fdid, sw, sh, x0, y0, w, h, cx, cy, dw, dh = unpack(leaf)
+        local fdid, sw, sh, x0, y0, w, h, cx, cy, dw, dh, sub = unpack(leaf)
         -- The quad is the bounding box of the dw x dh rect once rotated; the
         -- region w x h is stretched over it (kx, ky), so a room can grow to
         -- meet its neighbour.
@@ -666,7 +666,7 @@ function Config:DrawComposite(comp, parent, scaleX, scaleY, offX, offY, acquire,
             local urx, ury = uv(r - cx, t - cy)
             local lrx, lry = uv(r - cx, b - cy)
 
-            local tex = acquire()
+            local tex = acquire(sub)
             tex:SetSize((r - l) * scaleX, (b - t) * scaleY)
             tex:SetPoint("TOPLEFT", parent, "TOPLEFT",
                 offX + l * scaleX, -(offY + t * scaleY))

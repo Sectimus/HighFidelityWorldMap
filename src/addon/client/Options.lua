@@ -1007,11 +1007,10 @@ local options = {
 -- this one. Replace the filler with real widgets as the right-hand side
 -- fills up; just keep each row's relWidths summing to 0.9-0.99.
 --
--- Display order top to bottom is City, Zone, World, Continent -- Continent last
--- rather than in Config.MAP_TYPES' own order, which
--- stays as-is since other code reads it independently of how Options lays
--- these out.
-local MAP_TYPE_ORDER = { city = 15, zone = 20, world = 30, continent = 40 }
+-- Display order top to bottom is City, Zone, Continent, World -- rather than
+-- in Config.MAP_TYPES' own order, which stays as-is since other code reads it
+-- independently of how Options lays these out.
+local MAP_TYPE_ORDER = { city = 15, zone = 20, continent = 30, world = 40 }
 local mapBackgroundArgs = options.args.mapBackground.args
 for _, mapType in ipairs(Config.MAP_TYPES) do
     local desc = "Which background " .. mapType.label .. " draws with, "
@@ -1425,6 +1424,10 @@ function Options:Init()
         local profiles = LibStub("AceDBOptions-3.0"):GetOptionsTable(
             Config.dbObj)
         profiles.order = 100
+        -- Reset is destructive and AceDBOptions' button has no confirm.
+        profiles.args.reset.confirm = true
+        profiles.args.reset.confirmText = "Reset this profile to its default "
+            .. "settings? Your current settings in it will be lost."
         -- Inline: with no tab/tree child groups AceConfigDialog wraps the
         -- whole page in one ScrollFrame, instead of squeezing a tree
         -- under the settings above.

@@ -1332,7 +1332,11 @@ local function DoRefresh(force)
             local ky = layerH * scaleY / (submap.y1 - submap.y0)
             Config:DrawComposite(comp, Config.overlayFrame, kx, ky,
                 -submap.x0 * kx, -submap.y0 * ky,
-                function() return Pool:Acquire() end,
+                function(sub)
+                    local tex = Pool:Acquire()
+                    if sub then tex:SetDrawLayer("ARTWORK", sub - 8) end
+                    return tex
+                end,
                 { submap.x0, submap.y0, submap.x1, submap.y1 })
         end
         -- Experiment: every other zone's tiles are the client's own minimap

@@ -106,6 +106,30 @@ def mine_entries(spec):
     yield from mine_bake(spec)[1]
 
 
+def layer_leaves(leaves, angle):
+    """*leaves* (painted low to high) with a 12th value: the ARTWORK sublevel
+    (0..15, minus 8 in game) to draw each on. The game leaves the paint order
+    of textures on the same sublevel undefined, so each leaf sits one sublevel
+    above the highest leaf it overlaps; leaves that don't overlap share one."""
+    ac, as_ = abs(math.cos(math.radians(angle))), abs(math.sin(math.radians(angle)))
+    boxes = []
+    for leaf in leaves:
+        cx, cy, dw, dh = leaf[7:11]
+        hx, hy = (dw * ac + dh * as_) / 2, (dw * as_ + dh * ac) / 2
+        boxes.append((cx - hx, cx + hx, cy - hy, cy + hy))
+    subs = []
+    for i, (l, r, t, b) in enumerate(boxes):
+        sub = 0
+        for j in range(i):
+            l2, r2, t2, b2 = boxes[j]
+            if min(r, r2) - max(l, l2) > 2 and min(b, b2) - max(t, t2) > 2:
+                sub = max(sub, subs[j] + 1)
+        subs.append(sub)
+    if subs and max(subs) > 15:
+        print(f"  warning: {max(subs) + 1} overlapping layers, only 16 sublevels")
+    return [leaf + [min(s, 15)] for leaf, s in zip(leaves, subs)]
+
+
 def mine_bake(spec):
     """``(canvas, entries)``: *entries* as :func:`mine_entries` yields them,
     *canvas* the numbers the placement was composed with (``groups`` by
@@ -186,7 +210,7 @@ def mine_bake(spec):
         # group's bottom), not its mid-height: a tall cavern whose floor is
         # far down must not cover the small rooms standing in it.
         ordered = sorted(floors[name], key=lambda idx: (by_index[idx].bbox[2], -by_index[idx].bbox[5], idx))
-        leaves = [leaf for idx in ordered for leaf in placed(idx)]
+        leaves = layer_leaves([leaf for idx in ordered for leaf in placed(idx)], angle)
         entries.append((spec.floor_fdid_base + i,
                         {"w": w1, "h": h1, "a": angle, "l": leaves}))
     for order, idx in enumerate(tiled):
