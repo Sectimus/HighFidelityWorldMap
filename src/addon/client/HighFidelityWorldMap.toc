@@ -26,8 +26,11 @@ data/FDIDMap.lua
 data/MinimapTiles.lua
 data/CaveTiles.lua
 # data/IndoorTiles.lua, data/IndoorData.lua: the same for every other indoor
-# area (buildings, houses), used only while Other indoors is on.
+# area (buildings, houses), used only while Other indoors is on. IndoorTiles
+# also holds the Ironforge and Undercity canvases, which data/SubMaps.lua
+# places on those cities' world maps.
 data/IndoorTiles.lua
+data/SubMaps.lua
 # data/ZoneOverlays.lua, data/ZoneShapes.lua: how many exploration overlays
 # each zone has, and where each zone lies on the continent and World maps,
 # for the World/Continent Fog of War (ZoneFog.lua). data/ZoneOverlayTiles.lua:

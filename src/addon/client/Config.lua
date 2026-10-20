@@ -9,7 +9,7 @@ local Config = ns.Config
 Config.DEFAULTS = {
     enabled       = true,
     -- HD/SD blend (ToggleButton's slider), remembered per map type.
-    alphas        = { zone = 1.0, continent = 1.0, world = 1.0 },
+    alphas        = { zone = 1.0, continent = 1.0, world = 1.0, city = 1.0 },
     mapBackground = "hybrid",  -- see Config.BACKGROUNDS below
 
     -- Per-map-type overrides of mapBackground above (now labelled "Global
@@ -20,6 +20,7 @@ Config.DEFAULTS = {
     zoneMapBackground       = "global",
     continentMapBackground  = "global",
     worldMapBackground      = "global",
+    cityMapBackground       = "global",
 
     -- Cave map: a window that opens over the world map when the player is
     -- somewhere the map above it has nothing to show (caves, mines, micro
@@ -330,6 +331,12 @@ Config.BACKGROUNDS = {
                   .. "map frame.",
         seeThrough = true,
     },
+    {
+        key   = "blackout",
+        label = "Blackout",
+        desc  = "Complete and total darkness... A black background.",
+        rgb   = { 0, 0, 0 },
+    },
 }
 
 --- Is this background's art actually installed?
@@ -414,6 +421,7 @@ Config.MAP_TYPES = {
     { key = "zone",      label = "Zone Map" },
     { key = "continent", label = "Continent Map" },
     { key = "world",     label = "World Map" },
+    { key = "city",      label = "City Map" },
 }
 
 --- The AceDB field one map type's override lives in.
@@ -486,11 +494,19 @@ local MAP_TYPE_BY_UI_TYPE = {
     [UI_MAP_TYPE.Zone      or 3] = "zone",
 }
 
+-- The six capitals (Classic Era UiMapIDs). The client types them Zone, but
+-- they get their own background, HD/SD blend and Options row.
+local CITY_MAP_IDS = {
+    [1453] = true, [1454] = true, [1455] = true,  -- Stormwind, Orgrimmar, Ironforge
+    [1456] = true, [1457] = true, [1458] = true,  -- Thunder Bluff, Darnassus, Undercity
+}
+
 --- Which of Config.MAP_TYPES *mapID* is, or nil if it's some other kind
---- that doesn't get its own override.
+--- that doesn't get its own override. Cities are "city", not "zone".
 ---@param mapID number|nil
 ---@return string|nil
 function Config:ClassifyMapID(mapID)
+    if CITY_MAP_IDS[mapID] then return "city" end
     local info = mapID and C_Map.GetMapInfo(mapID)
     return info and MAP_TYPE_BY_UI_TYPE[info.mapType] or nil
 end
@@ -548,11 +564,15 @@ Config.NATIVE_ZONES_ORIGINAL = HFWMF_NATIVE_ZONES_ORIGINAL or {}
 -- Zone maps are not shipped as art: they are placements of the client's own
 -- minimap tiles (MinimapTiles.lua), keyed by UiMapID.
 Config.MINIMAP_ZONES = HFWMF_MINIMAP_ZONES or {}
+-- Underground capitals (Ironforge, Undercity), whose minimap tiles are the
+-- mountain above: same shape plus `submap`, a baked cave canvas (see
+-- GetCaveComposite) and the box of it the city's map shows (SubMaps.lua).
+Config.SUB_MAPS = HFWMF_SUB_MAPS or {}
 
 ---@param mapID number
 ---@return table|nil
 function Config:GetClientZone(mapID)
-    return self.MINIMAP_ZONES[mapID]
+    return self.MINIMAP_ZONES[mapID] or self.SUB_MAPS[mapID]
 end
 
 -- Baked cave floors/pieces as placements of the client's own WMO minimap
@@ -565,6 +585,66 @@ Config.INDOOR_TILES = HFWMF_INDOOR_TILES or {}
 ---@return table|nil
 function Config:GetCaveComposite(fdid)
     return self.CAVE_TILES[fdid] or self.INDOOR_TILES[fdid]
+end
+
+--- Draw a baked canvas from the client's own WMO group minimap tiles
+--- (scripts/emit_cave_tiles.py) instead of one shipped BLP. Each leaf is a
+--- region of a game texture, centred at (cx, cy) in the rotated canvas. The
+--- quad is the bounding box of that region once rotated by comp.a, and the
+--- eight-value SetTexCoord maps each quad corner back to the point of the
+--- source it shows; with CLAMPTOBLACKADDITIVE everything sampled outside the
+--- texture is transparent, so the corners vanish.
+---@param comp table  { w, h, a, l = { {fdid, srcW, srcH, x0, y0, w, h, cx, cy, dw, dh}, ... } }
+---@param parent table  frame the quads are anchored to
+---@param scaleX number  parent px per canvas px
+---@param scaleY number
+---@param offX number  where the canvas's top-left sits in parent
+---@param offY number
+---@param acquire function  returns a fresh texture, already on `parent`
+---@param clip table|nil  { x0, y0, x1, y1 } canvas box; art outside it is cut
+---@return table textures  everything drawn, in paint order
+function Config:DrawComposite(comp, parent, scaleX, scaleY, offX, offY, acquire, clip)
+    local rad = math.rad(comp.a)
+    local c, s = math.cos(rad), math.sin(rad)
+    local ac, as = math.abs(c), math.abs(s)
+    local drawn = {}
+    for _, leaf in ipairs(comp.l) do
+        local fdid, sw, sh, x0, y0, w, h, cx, cy, dw, dh = unpack(leaf)
+        -- The quad is the bounding box of the dw x dh rect once rotated; the
+        -- region w x h is stretched over it (kx, ky), so a room can grow to
+        -- meet its neighbour.
+        local kx, ky = w / dw, h / dh
+        local hx, hy = (dw * ac + dh * as) / 2, (dw * as + dh * ac) / 2
+        local mx, my = x0 + w / 2, y0 + h / 2
+        -- Quad edges, cut to the clip box. The source UVs are linear in the
+        -- offset from the leaf centre, so cutting an edge just moves its
+        -- corners' offsets.
+        local l, r, t, b = cx - hx, cx + hx, cy - hy, cy + hy
+        if clip then
+            l, r = math.max(l, clip[1]), math.min(r, clip[3])
+            t, b = math.max(t, clip[2]), math.min(b, clip[4])
+        end
+        if r > l and b > t then
+            -- Quad corner at offset (dx, dy) from the leaf centre -> source UV.
+            local function uv(dx, dy)
+                return (mx + (dx * c - dy * s) * kx) / sw,
+                       (my + (dx * s + dy * c) * ky) / sh
+            end
+            local ulx, uly = uv(l - cx, t - cy)
+            local llx, lly = uv(l - cx, b - cy)
+            local urx, ury = uv(r - cx, t - cy)
+            local lrx, lry = uv(r - cx, b - cy)
+
+            local tex = acquire()
+            tex:SetSize((r - l) * scaleX, (b - t) * scaleY)
+            tex:SetPoint("TOPLEFT", parent, "TOPLEFT",
+                offX + l * scaleX, -(offY + t * scaleY))
+            tex:SetTexCoord(ulx, uly, llx, lly, urx, ury, lrx, lry)
+            tex:SetTexture(fdid, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+            drawn[#drawn + 1] = tex
+        end
+    end
+    return drawn
 end
 
 --- Higher-resolution geometry for *mapID* under the given background, or
@@ -809,7 +889,7 @@ local BACKGROUND_RENAMES = {
 -- here and in Config.DEFAULTS/Config.MAP_TYPES.
 local BACKGROUND_FIELDS = {
     "mapBackground", "zoneMapBackground", "continentMapBackground",
-    "worldMapBackground",
+    "worldMapBackground", "cityMapBackground",
 }
 
 --- Apply BACKGROUND_RENAMES to every background field on *profile* (a

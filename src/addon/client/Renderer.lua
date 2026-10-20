@@ -993,10 +993,12 @@ local function DoRefresh(force)
     if clientZone then
         local reg = clientZone.regions[1]
         layerW, layerH = clientZone.layerW, clientZone.layerH
-        tilePxW, tilePxH = reg.tw, reg.th
-        cols, rows = reg.cols, reg.rows
-        gridX, gridY = reg.ox, reg.oy
-        for i, fdid in ipairs(reg.f) do
+        if reg then
+            tilePxW, tilePxH = reg.tw, reg.th
+            cols, rows = reg.cols, reg.rows
+            gridX, gridY = reg.ox, reg.oy
+        end
+        for i, fdid in ipairs(reg and reg.f or {}) do
             if fdid ~= 0 then tileSource[i] = fdid end
         end
         useBundled, useNative = true, true
@@ -1321,8 +1323,20 @@ local function DoRefresh(force)
             end)
         end
     elseif clientZone then
-        -- Experiment: this zone's tiles are the client's own minimap files,
-        -- placed in art-layer pixels (see MinimapTiles.lua). Tiles that
+        -- An underground capital: its baked canvas, cut to the box of it this
+        -- map shows. clientZone.submap is that box in canvas pixels.
+        local submap = clientZone.submap
+        local comp = submap and Config:GetCaveComposite(submap.fdid)
+        if comp then
+            local kx = layerW * scaleX / (submap.x1 - submap.x0)
+            local ky = layerH * scaleY / (submap.y1 - submap.y0)
+            Config:DrawComposite(comp, Config.overlayFrame, kx, ky,
+                -submap.x0 * kx, -submap.y0 * ky,
+                function() return Pool:Acquire() end,
+                { submap.x0, submap.y0, submap.x1, submap.y1 })
+        end
+        -- Experiment: every other zone's tiles are the client's own minimap
+        -- files, placed in art-layer pixels (see MinimapTiles.lua). Tiles that
         -- overhang the layer are clipped with SetTexCoord.
         for _, reg in ipairs(clientZone.regions) do
             local f, tw, th = reg.f, reg.tw, reg.th

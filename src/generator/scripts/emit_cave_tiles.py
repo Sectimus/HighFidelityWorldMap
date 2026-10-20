@@ -41,10 +41,10 @@ from hfwm.caves.compose import (  # noqa: E402
     world_align_rotation_degrees,
 )
 from hfwm.caves.fetch import (  # noqa: E402
-    WMO_SUBTILE_PX,
     _cached_path,
     fetch_group_tile,
     fetch_wmo_world_placement,
+    stitch_subtiles,
 )
 from hfwm.caves.mines import MINES  # noqa: E402
 from hfwm.config.paths import WMO_TILE_CACHE_DIR  # noqa: E402
@@ -82,24 +82,22 @@ def group_leaves(tile_fdid, extent_px=None):
                 [(tile_fdid, img.width, img.height, bbox[0], bbox[1],
                   bbox[2] - bbox[0], bbox[3] - bbox[1], bbox[0] if extent_px else 0, oy)])
 
-    px = WMO_SUBTILE_PX
-    rows = max(r for r, _ in tile_fdid) + 1
-    cols = max(c for _, c in tile_fdid) + 1
-    canvas = Image.new("RGBA", (cols * px, rows * px), (0, 0, 0, 0))
-    sizes = {}
-    for (r, c), f in tile_fdid.items():
-        sub = Image.open(_cached_path(f, WMO_TILE_CACHE_DIR)).convert("RGBA")
-        sizes[(r, c)] = sub.size
-        canvas.paste(sub, (c * px, r * px))
+    canvas, rects = stitch_subtiles(tile_fdid)
     bbox = canvas.split()[-1].getbbox() or (0, 0) + canvas.size
+    # The same corner-region correction as a plain tile, on the whole grid.
+    ox = oy = 0
+    if extent_px is not None:
+        ox = bbox[0]
+        oy = bbox[1] - max(0, min(canvas.height - math.ceil(round(extent_px[1], 6)), bbox[1]))
     leaves = []
-    for (r, c), f in sorted(tile_fdid.items()):
-        ix0, iy0 = max(bbox[0], c * px), max(bbox[1], r * px)
-        ix1, iy1 = min(bbox[2], (c + 1) * px), min(bbox[3], (r + 1) * px)
+    for key, f in sorted(tile_fdid.items()):
+        tx, ty, tw, th = rects[key]
+        ix0, iy0 = max(bbox[0], tx), max(bbox[1], ty)
+        ix1, iy1 = min(bbox[2], tx + tw), min(bbox[3], ty + th)
         if ix1 <= ix0 or iy1 <= iy0:
             continue
-        leaves.append((f, *sizes[(r, c)], ix0 - c * px, iy0 - r * px,
-                       ix1 - ix0, iy1 - iy0, ix0 - bbox[0], iy0 - bbox[1]))
+        leaves.append((f, tw, th, ix0 - tx, iy0 - ty,
+                       ix1 - ix0, iy1 - iy0, ix0 - bbox[0] + ox, iy0 - bbox[1] + oy))
     return bbox[2] - bbox[0], bbox[3] - bbox[1], leaves
 
 
@@ -183,7 +181,12 @@ def mine_bake(spec):
         lower, upper = split_floors_by_height(groups)
         floors = {"upper": upper, "lower": lower}
     for i, name in enumerate(floors):
-        leaves = [leaf for idx in floors[name] for leaf in placed(idx)]
+        # Later leaves paint over earlier ones, so lowest floor first: a lower
+        # room's art must sit under the higher one above it. The floor (a
+        # group's bottom), not its mid-height: a tall cavern whose floor is
+        # far down must not cover the small rooms standing in it.
+        ordered = sorted(floors[name], key=lambda idx: (by_index[idx].bbox[2], -by_index[idx].bbox[5], idx))
+        leaves = [leaf for idx in ordered for leaf in placed(idx)]
         entries.append((spec.floor_fdid_base + i,
                         {"w": w1, "h": h1, "a": angle, "l": leaves}))
     for order, idx in enumerate(tiled):
@@ -195,7 +198,8 @@ def mine_bake(spec):
 
 
 def lua_entry(fdid, e):
-    leaves = ",".join("{" + ",".join(f"{v:g}" for v in leaf) + "}" for leaf in e["l"])
+    # :g would print an FDID of 7+ digits as 8.11306e+06, a different file.
+    leaves = ",".join("{" + f"{int(leaf[0])}," + ",".join(f"{v:g}" for v in leaf[1:]) + "}" for leaf in e["l"])
     return f"    [{fdid}]={{w={e['w']},h={e['h']},a={e['a']:g},l={{{leaves}}}}},"
 
 

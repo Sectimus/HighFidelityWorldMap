@@ -50,7 +50,6 @@ local UI_MAP_TYPE = (Enum and Enum.UiMapType) or {}
 local MAP_TYPE_BY_KIND = {
     micro   = UI_MAP_TYPE.Micro   or 5,
     indoor  = UI_MAP_TYPE.Micro   or 5,
-    hub     = UI_MAP_TYPE.Micro   or 5,
     dungeon = UI_MAP_TYPE.Dungeon or 4,
 }
 
@@ -497,10 +496,10 @@ function CaveTable:FindPlayerFloor(preferredFloorID)
     local best, bestArea
     for _, name in ipairs(PlayerAreaNames()) do
         for _, place in ipairs(placesByName[name:lower()] or {}) do
-            -- Micro dungeons and hubs only out here. A dungeon's rows are in instance
+            -- Micro dungeons only out here. A dungeon's rows are in instance
             -- space, so its rectangle would be compared against world
             -- coordinates and could match anywhere.
-            if (place.kind == "micro" or place.kind == "hub")
+            if place.kind == "micro"
                and (mapID == nil or place.mapID == mapID) then
                 if not worldX or not place.bounds then
                     -- No position or no rectangle: the name and being indoors
@@ -581,7 +580,7 @@ function CaveTable:DebugTrace()
         add(("  findFloor: name=%q indexed=%s candidates=%d"):format(
             name, tostring(list ~= nil), list and #list or 0))
         for _, place in ipairs(list or {}) do
-            local kindOK = place.kind == "micro" or place.kind == "hub"
+            local kindOK = place.kind == "micro"
             local mapOK  = (mapID == nil or place.mapID == mapID)
             add(("    place=%s kind=%s mapOK=%s(place.mapID=%s)")
                 :format(place.name, place.kind, tostring(mapOK),
@@ -686,9 +685,9 @@ end
 --- Bay", so a title taken from the floor would never say "Gnomeregan".
 function CaveTable:GetPlaceName(floorID)
     local floor = self:GetFloor(floorID)
-    -- Indoors and hubs have no name of their own; nil sends the title down to the
+    -- Indoors have no name of their own; nil sends the title down to the
     -- client's subzone text (Cave:GetAreaTitle), as the real minimap does.
-    if floor and (floor.place.kind == "indoor" or floor.place.kind == "hub") then return nil end
+    if floor and floor.place.kind == "indoor" then return nil end
     return floor and floor.place.name or nil
 end
 

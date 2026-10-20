@@ -69,7 +69,7 @@ local ZONE_OVERLAYS = HFWMF_ZONE_OVERLAY_TILES or {}
 local function Revealing(mapID)
     return Config.db and Config.db.enabled and Config.overlayActive
         and Config:IsMixing() and not Config:FogOfWarEnabled()
-        and Config:ClassifyMapID(mapID) == "zone"
+        and (Config:ClassifyMapID(mapID) == "zone" or Config:ClassifyMapID(mapID) == "city")
         and Config:GetClientZone(mapID) ~= nil
 end
 

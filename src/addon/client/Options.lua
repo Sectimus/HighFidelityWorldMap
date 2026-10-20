@@ -45,6 +45,18 @@ local function MapTypeBackgroundValues()
     return values
 end
 
+--- Dropdown order: Config.BACKGROUNDS order (AceConfig would otherwise sort
+--- by label), "Use Global" first where present.
+local function BackgroundSorting(withGlobal)
+    return function()
+        local keys = { withGlobal and "global" or nil }
+        for _, bg in ipairs(Config:AvailableBackgrounds()) do
+            keys[#keys + 1] = bg.key
+        end
+        return keys
+    end
+end
+
 --- True when every Area Labels group is off, which greys out the other label
 --- settings.
 local function NoAreaLabelsOn()
@@ -650,6 +662,7 @@ local options = {
                     name = "Global Background",
                     desc = function() return Config:GetBackground().desc end,
                     values = BackgroundValues,
+                    sorting = BackgroundSorting(false),
                     get = function() return Config:GetBackground().key end,
                     set = function(_, value) Config:SetBackground(value) end,
                 },
@@ -891,11 +904,11 @@ local options = {
 -- this one. Replace the filler with real widgets as the right-hand side
 -- fills up; just keep each row's relWidths summing to 0.9-0.99.
 --
--- Display order top to bottom is Zone, World, Continent -- Continent last
--- rather than in Config.MAP_TYPES' own zone/continent/world order, which
+-- Display order top to bottom is City, Zone, World, Continent -- Continent last
+-- rather than in Config.MAP_TYPES' own order, which
 -- stays as-is since other code reads it independently of how Options lays
 -- these out.
-local MAP_TYPE_ORDER = { zone = 20, world = 30, continent = 40 }
+local MAP_TYPE_ORDER = { city = 15, zone = 20, world = 30, continent = 40 }
 local mapBackgroundArgs = options.args.mapBackground.args
 for _, mapType in ipairs(Config.MAP_TYPES) do
     local desc = "Which background " .. mapType.label .. " draws with, "
@@ -909,6 +922,7 @@ for _, mapType in ipairs(Config.MAP_TYPES) do
         name = mapType.label,
         desc = desc,
         values = MapTypeBackgroundValues,
+        sorting = BackgroundSorting(true),
         get = function() return Config:GetMapTypeBackgroundKey(mapType.key) end,
         set = function(_, value)
             Config:SetMapTypeBackground(mapType.key, value)
@@ -1006,6 +1020,15 @@ mapBackgroundArgs.fogFill = {
     width = "relative",
     relWidth = 0.3,
 }
+-- City Map is a single dropdown row (no Fog of War: cities have no
+-- exploration overlays); pads it so the next control doesn't slide up.
+mapBackgroundArgs.cityFill = {
+    order = MAP_TYPE_ORDER.city + 1,
+    type = "description",
+    name = " ",
+    width = "relative",
+    relWidth = 0.6,
+}
 -- Everything but the Enable toggle (and the intro text) greys out while the
 -- addon is off. `disabled` is inherited, but the deepest definition wins, so
 -- the cave children (which have their own) repeat the check above, and the
@@ -1033,7 +1056,7 @@ local MAIN_PAGE = {
         "keepCentered", "showPlayerCoords", "showMouseCoords",
         "toggleButtonEnabled", "toggleButtonMovable", "toggleButtonPoint",
         "mapBackground", "zoneMapBackground", "continentMapBackground",
-        "worldMapBackground", "worldMapClarity", "continentMapClarity",
+        "worldMapBackground", "cityMapBackground", "worldMapClarity", "continentMapClarity",
         "fogOfWarEnabled", "worldFogOfWar", "continentFogOfWar",
     },
     -- mapFade is a game CVar, not a profile field.

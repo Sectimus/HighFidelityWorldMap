@@ -27,6 +27,11 @@ from hfwm.pipeline.zone import _effective_tile_px  # noqa: E402
 CACHE = next(ROOT.glob(".cache-*"))
 OUT = ROOT.parents[0] / "addon" / "client" / "data" / "MinimapTiles.lua"
 
+# Underground capitals: their minimap tiles are the mountain above, not the
+# city. Left out; the city's own art is drawn from SubMaps.lua instead
+# (scripts/emit_indoors.py SUBMAPS).
+UNDERGROUND_SUBMAPS = {1455, 1458}  # Ironforge, Undercity
+
 
 def place_region(region, layer_w, layer_h, have):
     """Mirror process_zone()'s per-region geometry; return a Lua-ready dict."""
@@ -86,7 +91,8 @@ def main(only):
              "HFWMF_MINIMAP_ZONES = {"]
     zones = 0
     for folder, z in sorted(db.items()):
-        if z["ui_map_type"] != UI_MAP_TYPE_ZONE or (only and folder not in only):
+        if (z["ui_map_type"] != UI_MAP_TYPE_ZONE or (only and folder not in only)
+                or z["ui_map_id"] in UNDERGROUND_SUBMAPS):
             continue
         # Small zones (cities) have no `native` grid: Blizzard's layer is
         # already as sharp as their minimap source.
