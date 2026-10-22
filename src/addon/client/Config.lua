@@ -252,6 +252,14 @@ Config.DEFAULTS = {
     subzoneAreaLabelSpacing = 0,
     districtAreaLabelSpacing = 0,
     poiAreaLabelSpacing = 0,
+    -- Opacity (Options): base opacity of the type's labels, 0-1. Zoom fade
+    -- and the HD blend scale it further.
+    continentAreaLabelOpacity = 1,
+    capitalAreaLabelOpacity = 1,
+    townAreaLabelOpacity = 1,
+    subzoneAreaLabelOpacity = 1,
+    districtAreaLabelOpacity = 1,
+    poiAreaLabelOpacity = 1,
     -- Include Custom (CustomLabels.lua): per type, also show the hand-kept
     -- labels of that type, replacing same-named labels from the game's own data.
     continentAreaLabelIncludeCustom = false,

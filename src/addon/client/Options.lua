@@ -119,7 +119,7 @@ local AREA_LABEL_KINDS = {
 local function AreaLabelKeys(k)
     local keys = { k.show, k.scale }
     if k.auto then keys[#keys + 1] = k.auto end
-    for _, suffix in ipairs({ "ColorMode", "Color", "Color2", "GradientDir", "Outline", "Font", "IncludeCustom", "Uppercase", "Spacing" }) do
+    for _, suffix in ipairs({ "ColorMode", "Color", "Color2", "GradientDir", "Outline", "Font", "IncludeCustom", "Uppercase", "Spacing", "Opacity" }) do
         keys[#keys + 1] = k.color .. suffix
     end
     if k.fade then
@@ -331,6 +331,20 @@ local function AreaLabelGroup(order, title, k, desc)
                 get = function() return Config.db[colorKey .. "Spacing"] end,
                 set = function(_, value)
                     Config.db[colorKey .. "Spacing"] = value
+                    ns.AreaLabels:Refresh()
+                end,
+            },
+            opacity = {
+                order = 19,
+                type = "range",
+                name = "Opacity",
+                desc = "Base opacity of these labels. Zoom fading and the "
+                    .. "map's HD/SD blend apply on top of it.",
+                min = 0, max = 1, step = 0.05, isPercent = true,
+                hidden = function() return not Config.db[showKey] end,
+                get = function() return Config.db[colorKey .. "Opacity"] end,
+                set = function(_, value)
+                    Config.db[colorKey .. "Opacity"] = value
                     ns.AreaLabels:Refresh()
                 end,
             },

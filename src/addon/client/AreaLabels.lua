@@ -351,17 +351,15 @@ function AreaLabels:Refresh()
                 .. t.textureWidth .. "," .. t.textureHeight] = true
         end
     end
-    -- A shown custom label replaces any same-named label from the game's data.
-    local custom, replaced = {}, {}
+    local custom = {}
     for _, p in ipairs(all and CUSTOM_LABELS[mapID] or {}) do
         local k = KIND[p.kind]
         if Config.db[k.show] and (p.kind == "poi" or Config.db[k.color .. "IncludeCustom"]) then
             custom[#custom + 1] = p
-            replaced[p.name] = true
         end
     end
     for _, label in ipairs(all or {}) do
-        if Config.db[KIND[label.kind].show] and not replaced[label.name]
+        if Config.db[KIND[label.kind].show]
             and (not explored or label.overlay == nil or explored[label.overlay]) then
             labels[#labels + 1] = label
         end
@@ -392,7 +390,7 @@ function AreaLabels:Refresh()
             l = NewLabel()
             labelFrames[i] = l
         end
-        local alpha = ZoomFade(label.kind)
+        local alpha = ZoomFade(label.kind) * Config.db[KIND[label.kind].color .. "Opacity"]
         Paint(l, label, label.u * w, -label.v * h, AreaLabelScale(label.kind),
             alpha * frameAlpha >= 1)
         Fade(l, alpha)
