@@ -429,7 +429,10 @@ local function FogDesc(base, mapTypeKey)
     end
 end
 local FOG_ZONE_DESC = "Fog of war hides unexplored areas on the map, and "
-    .. "fills them in as you progress and explore."
+    .. "fills them in as you progress and explore.\n\nOff: the zone is drawn "
+    .. "as if fully explored. The high fidelity map covers only the "
+    .. "explorable ground, with the game's own map showing around it. For "
+    .. "the whole zone, use the Raw background instead of Hybrid."
 local FOG_WORLD_DESC = "On the World map, only draws this addon's map over "
     .. "zones you have fully explored. A zone with any area still "
     .. "undiscovered stays as the game draws it."

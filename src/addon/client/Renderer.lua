@@ -960,10 +960,16 @@ local function DoRefresh(force)
     -- Zone background). Without the map-type check, a Hybrid World/Continent
     -- map with Fog of War on took the explored-only path and drew just the
     -- subset of tiles under whatever exploration textures it found.
+    --
+    -- A Hybrid zone takes this path with Fog of War off too, as a fully
+    -- explored map: Exploration reveals every overlay (not just the
+    -- explored ones), and HD is cut to those shapes, so Blizzard's own art
+    -- still shows wherever the game has nothing to explore.
     local mapType = Config:ClassifyMapID(mapID)
-    local fogOfWar = Config:FogOfWarEnabled() and background.key == "hybrid"
+    local fogOfWar = background.key == "hybrid"
         and mapType ~= "world" and mapType ~= "continent"
         and ZONE_OVERLAYS[mapID] ~= nil
+    local fullyExplored = fogOfWar and not Config:FogOfWarEnabled()
 
     -- World/Continent Fog of War (Options' checkbox beside World Map): the
     -- zones fully explored, each { zone, u0, v0, u1, v1 } (the box its mask
@@ -1074,7 +1080,7 @@ local function DoRefresh(force)
     local hasExploredChunks = explored and #explored > 0
     local hasLiveBlizTextures = blizExploredTextures and #blizExploredTextures > 0
     local fogActive = fogOfWar and useBundled and (
-        hasExploredChunks or (not explored and hasLiveBlizTextures)
+        fullyExplored or hasExploredChunks or (not explored and hasLiveBlizTextures)
     )
 
     if trace then
@@ -1194,6 +1200,13 @@ local function DoRefresh(force)
         local filled = {}
         local pieceTex = {}
 
+        -- Fully explored: the reveal textures are only created once the
+        -- overlay is active (Activate above), after the enumeration that
+        -- chose this path, so look again.
+        if fullyExplored then
+            blizExploredTextures = Exploration:EnumerateOverlayTextures()
+        end
+
         local frameLeft = Config.overlayFrame:GetLeft()
         local frameTop  = Config.overlayFrame:GetTop()
         if trace then
@@ -1226,7 +1239,7 @@ local function DoRefresh(force)
             Config._fogRetryPending = true
             C_Timer.After(0, function()
                 Config._fogRetryPending = false
-                if Config.overlayActive and Config:FogOfWarEnabled() then
+                if Config.overlayActive and fogOfWar then
                     Renderer:ForceRefresh()
                 end
             end)
@@ -1250,7 +1263,7 @@ local function DoRefresh(force)
             Config._fogStreamRetryPending = true
             C_Timer.After(0.2, function()
                 Config._fogStreamRetryPending = false
-                if Config.overlayActive and Config:FogOfWarEnabled() then
+                if Config.overlayActive and fogOfWar then
                     Renderer:ForceRefresh()
                 end
             end)

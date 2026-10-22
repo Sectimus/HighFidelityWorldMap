@@ -64,12 +64,18 @@ local ZONE_OVERLAYS = HFWMF_ZONE_OVERLAY_TILES or {}
 
 --- Should the native map show every overlay of *mapID*, explored or not?
 --- Yes while the zone map is being drawn by this addon with Fog of War off
---- and the native art shows under the HD overlay (the HD/SD blend): HD shows
---- the whole zone then, so the native art must too.
+--- (an explored map has no fog), and either the native art shows under the
+--- HD overlay (the HD/SD blend: HD shows the whole zone, so the native art
+--- must too) or the zone background is Hybrid. A Hybrid zone is drawn by
+--- Renderer cropped to these same reveal textures, so they have to exist
+--- even at pure HD, where they stay invisible (HidePins) and only serve as
+--- the shapes HD is cut to; ground outside them stays Blizzard's own art.
 local function Revealing(mapID)
+    local mapType = Config:ClassifyMapID(mapID)
     return Config.db and Config.db.enabled and Config.overlayActive
-        and Config:IsMixing() and not Config:FogOfWarEnabled()
-        and (Config:ClassifyMapID(mapID) == "zone" or Config:ClassifyMapID(mapID) == "city")
+        and not Config:FogOfWarEnabled()
+        and (mapType == "zone" or mapType == "city")
+        and (Config:IsMixing() or (mapType == "zone" and Config:ZoneBackgroundIsHybrid()))
         and Config:GetClientZone(mapID) ~= nil
 end
 
