@@ -6,14 +6,12 @@ from .build import GAME_BUILD
 
 WAGO_DB2_FMT = "https://wago.tools/db2/{table}/csv?build={build}"
 WAGO_DB2_LATEST_FMT = "https://wago.tools/db2/{table}/csv"
-WAGO_CASC_FMT = "https://wago.tools/api/casc/{}"
-
-# The same CASC endpoint, pinned.  ``/api/casc/{fdid}`` on its own serves
-# whichever build was ingested most recently, so a file that only exists
-# on retail answers 200 there and would be baked into a table claiming to
-# describe this build.  With ``?build=`` it 404s instead, which is what
-# makes the art-presence probe in hfwm/gamedata/microdungeon.py mean
-# anything.
+# CASC files are only ever fetched pinned.  ``/api/casc/{fdid}`` on its own
+# serves whichever build was ingested most recently (retail, MoP Classic,
+# Classic Era ...), so a file that only exists elsewhere answers 200 there
+# and would be baked into a table claiming to describe this build.  With
+# ``?build=`` it 404s instead, which is what makes the art-presence probe
+# in hfwm/gamedata/microdungeon.py mean anything.
 WAGO_CASC_PINNED_FMT = (
     "https://wago.tools/api/casc/{fdid}?build=" + GAME_BUILD
 )

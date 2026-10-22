@@ -227,6 +227,7 @@ Config.DEFAULTS = {
     capitalAreaLabelFont = "global",
     townAreaLabelFont = "global",
     subzoneAreaLabelFont = "global",
+    districtAreaLabelFont = "global",
 }
 
 --- Fonts the Area Labels can use, in dropdown order. Blizzard ships these

@@ -18,7 +18,7 @@ from .wmo import WmoPlacement, parse_modf_placements, select_placement
 
 
 def _cached_path(fdid: int, cache_dir: Path) -> Path:
-    return download_casc_cached(fdid, cache_dir, pinned=True)
+    return download_casc_cached(fdid, cache_dir)
 
 
 def fetch_wmo_root(fdid: int) -> bytes:

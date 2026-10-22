@@ -5,14 +5,15 @@ Five kinds, all from this build's own DB2 exports (see hfwm.config.endpoints):
   continent  UiMap rows of Type 2, placed at the centre of the art.
   capital    AreaPOI rows with Flags 29 (see CAPITAL_FLAGS).
   town       AreaPOI rows with Flags 5 (see TOWN_FLAGS).
-  subzone    WorldMapOverlay rects of outdoor areas (AreaTable ParentAreaID != 0).
+  subzone    AreaTable areas under a zone map's own area, placed by terrain.
   district   the named parts of a capital, on that capital's own map (below).
 
 A town or capital is placed on the zone map its name resolves to through
 WorldMapOverlay (AreaTable name -> overlay art -> UiMap), at the POI's world
 position mapped through that map's UiMapAssignment Region_* bounds. A subzone
-is placed at the centre of its own overlay rect. Names that do not resolve are
-listed and skipped, not guessed.
+is placed on the terrain: the chunk of its area nearest the middle of the
+chunks whose ADT AreaID it is, inside the zone map it sits under. Names that
+do not resolve are listed and skipped, not guessed.
 
 A district is a part of a capital's own map (Stormwind City, not Elwynn
 Forest): an AreaTable area under the city, placed at the centre of its
@@ -50,7 +51,6 @@ from hfwm.config.endpoints import WAGO_CASC_PINNED_FMT  # noqa: E402
 from hfwm.config.paths import (  # noqa: E402
     AREA_LABEL_DATA_FILE, CACHE_ROOT, WMO_CACHE_DIR)
 from hfwm.config.tiles import (  # noqa: E402
-    EXPECTED_ART_LAYER_DIMS,
     TILE_WORLD_SIZE,
     UI_MAP_TYPE_CONTINENT,
     UI_MAP_TYPE_ZONE,
@@ -58,9 +58,6 @@ from hfwm.config.tiles import (  # noqa: E402
 from hfwm.gamedata.tables import fetch_pinned_table  # noqa: E402
 from hfwm.infra.http import download_casc_cached  # noqa: E402
 from hfwm.lua.literals import lua_string  # noqa: E402
-
-# Overlay hit rects are in the art layer's own pixel space.
-ART_W, ART_H = EXPECTED_ART_LAYER_DIMS[(4, 3)]
 
 # AreaPOI.Flags. Observed on this build: capitals carry 29, towns 5.
 CAPITAL_FLAGS = "29"
@@ -207,7 +204,7 @@ def _wmo_footprints(cities, named):
             if city is None:
                 continue
             seen.add(placement.unique_id)
-            root = download_casc_cached(fdid, WMO_CACHE_DIR, pinned=True)
+            root = download_casc_cached(fdid, WMO_CACHE_DIR)
             groups = parse_wmo_groups(root.read_bytes(), {})
             index_of = _group_indices(wmo_paths[fdid], len(groups),
                                       fdid_of_path, cache)
@@ -221,8 +218,10 @@ def _wmo_footprints(cities, named):
 
 
 def _terrain_centres(grid, region, wanted):
-    """{AreaID: (x, y)}: the centre of each wanted area's terrain chunks inside
-    *region*. *grid* is terrain_areas' one-AreaID-per-chunk array."""
+    """{AreaID: (x, y)}: a point of each wanted area's terrain chunks inside
+    *region*: the chunk nearest their mean, so a crescent coast or a river is
+    labelled on itself and not in the sea beside it. *grid* is terrain_areas'
+    one-AreaID-per-chunk array."""
     x0, y0, x1, y1 = region
     r0, r1 = (math.floor(32 * 16 - x / CHUNK) for x in (x1, x0))
     c0, c1 = (math.floor(32 * 16 - y / CHUNK) for y in (y1, y0))
@@ -231,8 +230,9 @@ def _terrain_centres(grid, region, wanted):
     for aid in wanted:
         rows, cols = np.nonzero(sub == aid)
         if len(rows):
-            out[aid] = ((32 * 16 - (rows.mean() + r0 + 0.5)) * CHUNK,
-                        (32 * 16 - (cols.mean() + c0 + 0.5)) * CHUNK)
+            k = np.argmin((rows - rows.mean()) ** 2 + (cols - cols.mean()) ** 2)
+            out[aid] = ((32 * 16 - (rows[k] + r0 + 0.5)) * CHUNK,
+                        (32 * 16 - (cols[k] + c0 + 0.5)) * CHUNK)
     return out
 
 
@@ -276,7 +276,6 @@ def main():
     # capital whose rect is zero-size still resolves to its zone.
     art_for_area = {}   # areaID -> [uiMapID]
     overlay_key = {}    # (uiMapID, areaID) -> (rect size, overlay key)
-    subzone_rect = {}   # (uiMapID, areaID) -> (rect size, u, v)
     for r in overlays:
         uid = art_to_map.get(_i(r, "UiMapArtID"))
         if uid is None or not is_zone(uid):
@@ -294,11 +293,6 @@ def main():
             art_for_area.setdefault(aid, []).append(uid)
             if (uid, aid) not in overlay_key or size > overlay_key[(uid, aid)][0]:
                 overlay_key[(uid, aid)] = (size, key)
-            if centre is None or k != 0:
-                continue
-            u, v = centre[0] / ART_W, centre[1] / ART_H
-            if (uid, aid) not in subzone_rect or size > subzone_rect[(uid, aid)][0]:
-                subzone_rect[(uid, aid)] = (size, u, v)
 
     # ---- towns and capitals ----------------------------------------------
     unresolved = []
@@ -343,21 +337,6 @@ def main():
         if not done:
             unresolved.append(name)
 
-    # ---- subzones -----------------------------------------------------------
-    areas_by_id = {_i(r, "ID"): r for r in areatable}
-    for (uid, aid), (_, u, v) in sorted(subzone_rect.items()):
-        at = areas_by_id.get(aid)
-        if not at or _i(at, "ParentAreaID") in (0, None):
-            continue
-        name = at["AreaName_lang"]
-        if not name or (uid, name) in placed:
-            continue
-        placed.add((uid, name))
-        out.setdefault(uid, []).append({
-            "name": name, "kind": "subzone", "u": u, "v": v,
-            "overlay": overlay_key[(uid, aid)][1],
-        })
-
     # ---- city districts -----------------------------------------------------
     # The capitals' own maps: the zone map each capital's AreaTable row owns.
     owner = {_i(r, "AreaID"): r for r in assignments
@@ -389,11 +368,44 @@ def main():
     footprints = _wmo_footprints(
         {uid: (_i(asg, "MapID"), regions[uid]) for uid, (asg, _) in cities.items()},
         wmo_names)
+    zone_rows = {uid: rows for uid, rows in by_map.items() if is_zone(uid)}
     grids = terrain_areas(tiles_needed({
-        uid: [dict(map_id=_i(asg, "MapID"), top=regions[uid][2],
-                   bottom=regions[uid][0], left=regions[uid][3],
-                   right=regions[uid][1])]
-        for uid, (asg, _) in cities.items()}))
+        uid: [dict(map_id=_i(a, "MapID"), top=_region(a)[2], bottom=_region(a)[0],
+                   left=_region(a)[3], right=_region(a)[1]) for a in rows]
+        for uid, rows in zone_rows.items()}))
+
+    # ---- subzones -----------------------------------------------------------
+    # Placed by this build's own terrain: the AreaIDs of the ADT chunks inside
+    # each zone map's region. WorldMapOverlay rects are art-space and predate
+    # the build's terrain; they only say which areas the map lists.
+    # An area is a subzone of the zone map whose root area it sits under.
+    for uid, rows in sorted(zone_rows.items()):
+        if uid in cities:
+            continue
+        for asg in rows:
+            root = _i(asg, "AreaID")
+            if not root:
+                continue
+            region = _region(asg)
+            sub = [a for a in areatable
+                   if _i(a, "ID") != root and under(_i(a, "ID"), root)]
+            centres = _terrain_centres(grids[_i(asg, "MapID")], region,
+                                       {_i(a, "ID") for a in sub})
+            for a in sub:
+                aid, name = _i(a, "ID"), a["AreaName_lang"]
+                if not name or aid not in centres or (uid, name) in placed:
+                    continue
+                # What the map lists: an area with an overlay row, or an
+                # explorable one newer than the overlay table (New Avalon).
+                # Not the seas, rivers and roads the terrain also names.
+                if (uid, aid) not in overlay_key and not _i(a, "ExplorationLevel"):
+                    continue
+                placed.add((uid, name))
+                u, v = _uv(region, *centres[aid])
+                entry = {"name": name, "kind": "subzone", "u": u, "v": v}
+                if (uid, aid) in overlay_key:
+                    entry["overlay"] = overlay_key[(uid, aid)][1]
+                out.setdefault(uid, []).append(entry)
 
     for uid, (asg, city_aid) in sorted(cities.items()):
         region = regions[uid]

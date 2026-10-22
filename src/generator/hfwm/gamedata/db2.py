@@ -347,10 +347,7 @@ def _download_wdt_grids(
 ) -> tuple[dict[int, dict[tuple[int, int], int]], dict[str, dict]]:
     """Parse MAID grids for every ``{map_id: wdt_fdid}`` in *needed*.
 
-    Also returns provenance for each WDT.  ``wago.tools``'
-    ``/api/casc/{fdid}`` endpoint is **not** product-pinned, so recording
-    the hash and tile footprint is the only way to notice if a future run
-    silently ingests a different product's terrain.
+    Also returns provenance for each WDT (its md5 and tile footprint).
     """
     print(f"  Downloading {len(needed)} WDT files ...", flush=True)
     grids: dict[int, dict[tuple[int, int], int]] = {}
@@ -598,12 +595,8 @@ def _write_provenance(
 ) -> None:
     """Record what this run actually ingested.
 
-    The DB2 exports are build-pinned, but ``wago.tools``'
-    ``/api/casc/{fdid}`` serves whichever build was most recently
-    ingested.  If a later retail ingest flips a shared FDID (Azeroth's
-    WDT 775971 and Kalimdor's 782779 are the exposed ones), the md5 and
-    tile footprint recorded here will no longer match and the mismatch
-    is diagnosable instead of silent.
+    The DB2 exports and CASC files are both build-pinned. The md5 and tile
+    footprint recorded here make a changed WDT diagnosable.
     """
     payload = {
         "product": GAME_PRODUCT,
@@ -611,9 +604,8 @@ def _write_provenance(
         "generated": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "maid_field": maid_field,
         "note": (
-            "DB2 exports are pinned to 'build'. The CASC file endpoint is "
-            "NOT product-pinned — verify wdt md5s below before trusting a "
-            "re-run against a different ingest."
+            "DB2 exports and CASC files are both pinned to 'build'. WDT "
+            "files cached by a run before CASC pinning may predate it."
         ),
         "wdts": wdt_provenance,
         "zones": {

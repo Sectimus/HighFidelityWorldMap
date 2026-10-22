@@ -19,10 +19,9 @@ Forever" beta client.  Differences from the retail configuration:
 * Every DB2 request is pinned to :data:`~hfwm.config.build.GAME_BUILD`.
   ``WorldMapArea`` does not exist on this build (it 404s) and is not used
   at all — zone bounds come from ``UiMapAssignment.Region_*``.
-* All caches live under a build-stamped directory.  ``wago.tools``'
-  ``/api/casc/{fdid}`` endpoint is **not** product-pinned — it serves
-  whichever build was most recently ingested — so FDID-keyed caches from a
-  different product must never be shared with this project.
+* All caches live under a build-stamped directory, and every CASC file is
+  fetched with ``?build=`` (``/api/casc/{fdid}`` alone serves whichever
+  product was ingested last), so no other product's data reaches them.
 * No continent overlays / zone presets / terrain-phase overrides: those
   are Cataclysm-and-later retail concerns (Vashj'ir, Silithus phasing, the
   150-tile continent art style).  Forever's world is vanilla Azeroth

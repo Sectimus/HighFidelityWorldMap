@@ -840,7 +840,7 @@ local options = {
                         .. "as the Mage Quarter, on that city's own map. Click "
                         .. "the city on the zone map to see them."),
                 areaLabelFont = {
-                    order = 13,
+                    order = 9,
                     type = "select",
                     name = "Global Font",
                     desc = "Font of every map label whose own Font is "

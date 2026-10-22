@@ -8,7 +8,7 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 
 from ..config.build import USER_AGENT
-from ..config.endpoints import WAGO_CASC_FMT, WAGO_CASC_PINNED_FMT
+from ..config.endpoints import WAGO_CASC_PINNED_FMT
 
 
 def _request(url: str) -> Request:
@@ -28,31 +28,21 @@ def fetch_csv(url: str, *, timeout: int = 60) -> list[dict]:
     return list(csv.DictReader(io.StringIO(text)))
 
 
-def _casc_url(fdid: int, pinned: bool) -> str:
-    if pinned:
-        return WAGO_CASC_PINNED_FMT.format(fdid=fdid)
-    return WAGO_CASC_FMT.format(fdid)
+def download_casc(fdid: int) -> bytes:
+    """Download a raw file from the CASC endpoint by FileDataID, from the
+    pinned build only. Unpinned, the endpoint serves whichever build wago.tools
+    ingested last (another product's terrain, tiles and WMOs), so there is no
+    unpinned mode (see :data:`hfwm.config.endpoints.WAGO_CASC_PINNED_FMT`)."""
+    return fetch_url(WAGO_CASC_PINNED_FMT.format(fdid=fdid), timeout=30)
 
 
-def download_casc(fdid: int, *, pinned: bool = False) -> bytes:
-    """Download a raw file from the CASC endpoint by FileDataID.
-
-    *pinned* asks for the pinned build's copy specifically; unpinned, the
-    endpoint serves whichever build wago.tools ingested last (see
-    :data:`hfwm.config.endpoints.WAGO_CASC_PINNED_FMT`).
-    """
-    return fetch_url(_casc_url(fdid, pinned), timeout=30)
-
-
-def download_casc_cached(
-    fdid: int, cache_dir: Path, *, pinned: bool = False,
-) -> Path:
+def download_casc_cached(fdid: int, cache_dir: Path) -> Path:
     """Download a CASC file, caching to *cache_dir*/{fdid}.blp."""
     cache_dir.mkdir(parents=True, exist_ok=True)
     path = cache_dir / f"{fdid}.blp"
     if path.exists() and path.stat().st_size > 0:
         return path
-    path.write_bytes(download_casc(fdid, pinned=pinned))
+    path.write_bytes(download_casc(fdid))
     return path
 
 
@@ -65,7 +55,7 @@ def casc_file_exists(fdid: int, *, timeout: int = 30) -> bool:
     this build.
     """
     try:
-        with urlopen(_request(_casc_url(fdid, True)), timeout=timeout) as resp:
+        with urlopen(_request(WAGO_CASC_PINNED_FMT.format(fdid=fdid)), timeout=timeout) as resp:
             return len(resp.read(64)) > 0
     except OSError:  # includes HTTPError (a 404 means "not on this build")
         return False

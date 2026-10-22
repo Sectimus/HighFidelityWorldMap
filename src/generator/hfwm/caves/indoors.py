@@ -112,7 +112,7 @@ def _present(fdid: int, cache_dir: Path) -> bool:
     emptiness is the signal. The empty file is removed so the cache never
     holds a file that isn't there.
     """
-    path = download_casc_cached(fdid, cache_dir, pinned=True)
+    path = download_casc_cached(fdid, cache_dir)
     if path.stat().st_size:
         return True
     path.unlink()
