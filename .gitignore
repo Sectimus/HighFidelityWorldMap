@@ -25,3 +25,6 @@ src/addon/client/Libs/
 
 # Local Kdenlive trailer project (video/audio assets, thumbnails)
 assets/projects/trailer/
+
+# Local omp agent/command config
+.omp/

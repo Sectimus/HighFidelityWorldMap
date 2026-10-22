@@ -62,6 +62,7 @@ KeepCentered.lua
 Integrations.lua
 ToggleButton.lua
 Coords.lua
+CustomLabels.lua
 AreaLabels.lua
 Commands.lua
 Options.lua

@@ -131,9 +131,9 @@ Config.DEFAULTS = {
     showPlayerCoords = true,
     showMouseCoords  = true,
 
-    -- Area Labels (AreaLabels.lua): names drawn on the map over its art, in five
-    -- groups: continent names, capital cities, towns and hubs, subzones, and
-    -- city districts (only on a capital's own map).
+    -- Area Labels (AreaLabels.lua): names drawn on the map over its art, in six
+    -- groups: continent names, capital cities, towns and hubs, points of
+    -- interest, subzones, and city districts (only on a capital's own map).
     showAreaContinentNames = false,
     showAreaCapitalCities = true,
     showAreaTownsHubs = true,
@@ -150,6 +150,14 @@ Config.DEFAULTS = {
     townAreaLabelScale = 1.3,
     subzoneAreaLabelScale = 0.18,
     districtAreaLabelScale = 0.8,
+    -- Options' Area Labels sections: collapsed (only Enabled and the button
+    -- show) or expanded, remembered per profile.
+    continentAreaLabelCollapsed = true,
+    capitalAreaLabelCollapsed = true,
+    townAreaLabelCollapsed = true,
+    subzoneAreaLabelCollapsed = true,
+    districtAreaLabelCollapsed = true,
+    poiAreaLabelCollapsed = true,
     -- Auto-scale per label type: labels grow as you zoom out and shrink as you
     -- zoom in, from their label scale at the loosest zoom step. See
     -- AreaLabels.lua's AreaLabelScale.
@@ -228,6 +236,46 @@ Config.DEFAULTS = {
     townAreaLabelFont = "global",
     subzoneAreaLabelFont = "global",
     districtAreaLabelFont = "global",
+    -- Uppercase (Options): draws the label's text in capital letters. On for
+    -- Points of Interest only.
+    continentAreaLabelUppercase = false,
+    capitalAreaLabelUppercase = false,
+    townAreaLabelUppercase = false,
+    subzoneAreaLabelUppercase = false,
+    districtAreaLabelUppercase = false,
+    poiAreaLabelUppercase = true,
+    -- Letter spacing (Options): space between letters, as a fraction of the text
+    -- size. 0 is the font's own spacing.
+    continentAreaLabelSpacing = 0,
+    capitalAreaLabelSpacing = 0,
+    townAreaLabelSpacing = 0,
+    subzoneAreaLabelSpacing = 0,
+    districtAreaLabelSpacing = 0,
+    poiAreaLabelSpacing = 0,
+    -- Include Custom (CustomLabels.lua): per type, also show the hand-kept
+    -- labels of that type, replacing same-named labels from the game's own data.
+    continentAreaLabelIncludeCustom = false,
+    capitalAreaLabelIncludeCustom = false,
+    townAreaLabelIncludeCustom = false,
+    subzoneAreaLabelIncludeCustom = false,
+    districtAreaLabelIncludeCustom = false,
+    -- Points of Interest: CustomLabels.lua entries of kind "poi", always shown
+    -- while this type is on (no Include Custom toggle of its own). Defaults
+    -- match towns and hubs.
+    showAreaPOIs = true,
+    -- 65% of the Towns and hubs scale (1.3), which Options' Label scale reads against.
+    poiAreaLabelScale = 0.845,
+    poiAreaLabelColorMode = "solid",
+    poiAreaLabelColor = { 1, 247 / 255, 227 / 255 },
+    poiAreaLabelColor2 = { 1, 200 / 255, 90 / 255 },
+    poiAreaLabelGradientDir = "VERTICAL",
+    poiAreaLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
+    poiAreaLabelZoomFade = true,
+    poiAreaLabelFadeVisibleAt = 0,
+    poiAreaLabelFadeInvisibleAt = 3,
+    poiAreaLabelFadeInSpeed = 1,
+    poiAreaLabelFadeOutSpeed = 1,
+    poiAreaLabelFont = "global",
 }
 
 --- Fonts the Area Labels can use, in dropdown order. Blizzard ships these
