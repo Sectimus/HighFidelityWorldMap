@@ -262,11 +262,11 @@ Config.DEFAULTS = {
     poiAreaLabelOpacity = 1,
     -- Include Custom (CustomLabels.lua): per type, also show the hand-kept
     -- labels of that type, replacing same-named labels from the game's own data.
-    continentAreaLabelIncludeCustom = false,
-    capitalAreaLabelIncludeCustom = false,
-    townAreaLabelIncludeCustom = false,
-    subzoneAreaLabelIncludeCustom = false,
-    districtAreaLabelIncludeCustom = false,
+    continentAreaLabelIncludeCustom = true,
+    capitalAreaLabelIncludeCustom = true,
+    townAreaLabelIncludeCustom = true,
+    subzoneAreaLabelIncludeCustom = true,
+    districtAreaLabelIncludeCustom = true,
     -- Points of Interest: CustomLabels.lua entries of kind "poi", always shown
     -- while this type is on (no Include Custom toggle of its own). Defaults
     -- match towns and hubs.
