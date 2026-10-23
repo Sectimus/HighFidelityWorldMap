@@ -366,18 +366,19 @@ function AreaLabels:Refresh()
         end
         return false
     end
-    local custom = {}
+    local custom, shadowed = {}, {}
     for _, p in ipairs(all and CUSTOM_LABELS[mapID] or {}) do
         local k = KIND[p.kind]
-        if Config.db[k.show] and (p.kind == "poi" or Config.db[k.color .. "IncludeCustom"])
+        if p.hide then
+            shadowed[p.kind .. "|" .. p.name] = true
+        elseif Config.db[k.show] and (p.kind == "poi" or Config.db[k.color .. "IncludeCustom"])
             and (p.kind == "continent" or CustomExplored(p)) then
             custom[#custom + 1] = p
+            shadowed[p.kind .. "|" .. p.name] = true
         end
     end
-    -- A shown custom label takes over a same-kind area label of the same name
-    -- on this map (a custom town replaces the real town); other kinds coexist.
-    local shadowed = {}
-    for _, p in ipairs(custom) do shadowed[p.kind .. "|" .. p.name] = true end
+    -- A shown custom label, or a hide entry, takes over a same-kind area label
+    -- of the same name on this map. Other kinds coexist.
     for _, label in ipairs(all or {}) do
         if Config.db[KIND[label.kind].show]
             and (not explored or label.overlay == nil or explored[label.overlay])

@@ -19,6 +19,8 @@
 --   u, v  the centre in 0-1 map coordinates from the map's top-left.
 --   h     optional label height in canvas units at scale 1; defaults per kind
 --         (AreaLabels.lua's DEFAULT_H).
+--   hide  optional true: draws nothing, but hides the same-named same-kind area
+--         label on that map (removes a generated label).
 -- Example:
 --   [1416] = {
 --       { name = "Dalaran", kind = "capital", u = 0.179, v = 0.705 },
@@ -26,7 +28,15 @@
 -------------------------------------------------------------------------------
 HFWMF_CUSTOM_LABELS = {
     [2521] = {
-        { name = "Ruins of Ban'aethal", text = "Ruins of\nBan'aethal", kind = "poi", u = 0.578, v = 0.298 },
+        { name = "Ruins of Ban'aethal", text = "Ruins of\nBan'aethal", kind = "poi", u = 0.617, v = 0.248 },
+        { name = "Thendal Village", text = "Thendal\nVillage", kind = "poi", u = 0.414, v = 0.185 },
+        { name = "Shen'dar Village", text = "Shen'dar\nVillage", kind = "poi", u = 0.480, v = 0.436 },
+        { name = "Falaath Village", text = "Falaath\nVillage", kind = "poi", u = 0.518, v = 0.535 },
+        { name = "Shrine of Akir", text = "Shrine of\nAkir", kind = "poi", u = 0.634, v = 0.439 },
+        { name = "Valanaar", kind = "poi", u = 0.637, v = 0.818 },
+    },
+    [1458] = {
+        { name = "Canals", kind = "district", hide = true, u = 0.662, v = 0.435 },
     },
     [1429] = {
         { name = "Northshire", kind = "poi", u = 0.486, v = 0.433 },
@@ -162,6 +172,7 @@ HFWMF_CUSTOM_LABELS = {
         { name = "Lake Nazferiti", text = "Lake\nNazferiti", kind = "poi", u = 0.408, v = 0.184 },
         { name = "Mosh'Ogg Ogre Mound", text = "Mosh'Ogg\nOgre Mound", kind = "poi", u = 0.496, v = 0.306 },
         { name = "Gurubashi Arena", text = "Gurubashi\nArena", kind = "poi", u = 0.304, v = 0.451 },
+        { name = "Grom'gol Base Camp", text = "Grom'gol\nBase Camp", kind = "town", u = 0.319, v = 0.284 },
     },
     [1438] = {
         { name = "Shadowglen", kind = "poi", u = 0.607, v = 0.433 },
