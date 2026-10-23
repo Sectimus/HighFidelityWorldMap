@@ -341,6 +341,7 @@ function AreaLabels:Refresh()
         and AREA_LABELS[WorldMapFrame:GetMapID() or 0]
     -- Under Fog of War only explored areas are labelled; continent names always
     -- show. A label's overlay is its area's explored-texture key (see emitter).
+    -- A subzone with no overlay key cannot be checked, so it stays hidden.
     local mapID = WorldMapFrame:GetMapID() or 0
     local fog = Config:FogOfWarEnabled() or Config:WorldFogOfWarEnabled(mapID)
     local explored, rects
@@ -381,7 +382,8 @@ function AreaLabels:Refresh()
     -- of the same name on this map. Other kinds coexist.
     for _, label in ipairs(all or {}) do
         if Config.db[KIND[label.kind].show]
-            and (not explored or label.overlay == nil or explored[label.overlay])
+            and (not explored or (label.overlay and explored[label.overlay])
+                or (label.overlay == nil and label.kind ~= "subzone"))
             and not shadowed[label.kind .. "|" .. label.name] then
             labels[#labels + 1] = label
         end
