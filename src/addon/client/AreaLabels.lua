@@ -2,9 +2,9 @@
 -- HFWM-Forever Area Labels
 --
 -- "Area Labels" on the world map: continent names, capital cities, towns and hubs,
--- subzones, and city districts, each group toggled from Options
+-- points of interest, subzones, and city districts, each group toggled from Options
 -- (Config.db.showAreaContinentNames, showAreaCapitalCities, showAreaTownsHubs,
--- showAreaSubzoneNames, showAreaCityDistricts). The names come from
+-- showAreaPOIs, showAreaSubzoneNames, showAreaCityDistricts). The names come from
 -- AreaLabelData.lua, generated from the game's own DB2 tables by
 -- src/generator/scripts/emit_area_labels.py.
 --
@@ -27,6 +27,15 @@ local WorldMapFrame = _G.WorldMapFrame
 -- label scale 1; u/v the centre in 0-1 map coordinates from the top-left.
 local AREA_LABELS = HFWMF_AREA_LABELS or {}
 
+--- Hand-kept labels from CustomLabels.lua, same shape as AREA_LABELS entries
+--- (h optional). Each shows under its kind's Include Custom toggle; kind
+--- "poi" shows with the Points of Interest type itself.
+local CUSTOM_LABELS = HFWMF_CUSTOM_LABELS or {}
+
+--- Label height in canvas units at scale 1 for a custom POI with no h of its
+--- own. Same values as AREA_LABEL_H in emit_area_labels.py.
+local DEFAULT_H = { continent = 24, capital = 16, town = 12, subzone = 10, poi = 10, district = 12 }
+
 --- Per label kind: the Options toggle that shows it, and its own scale and
 --- Auto-scale fields.
 local KIND = {
@@ -38,6 +47,8 @@ local KIND = {
                   auto = "townAutoScale", color = "townAreaLabel" },
     subzone   = { show = "showAreaSubzoneNames", scale = "subzoneAreaLabelScale",
                   color = "subzoneAreaLabel" },
+    poi       = { show = "showAreaPOIs", scale = "poiAreaLabelScale",
+                  color = "poiAreaLabel" },
     district  = { show = "showAreaCityDistricts", scale = "districtAreaLabelScale",
                   auto = "districtAutoScale", color = "districtAreaLabel" },
 }
@@ -71,12 +82,74 @@ local OUTLINE_PAD = 0.2
 local BORDER_RATIO = 0.05
 
 local frame
-local labelFrames = {}  -- [i] = { holder, outline = {FontString}, bands = {{clip, fs}} }
+local labelFrames = {}  -- [i] = { holder, outline = {run}, bands = {{clip, run}} }
 
-local function Text(parent, layer)
-    local fs = parent:CreateFontString(nil, layer)
-    fs:SetJustifyH("LEFT")
-    return fs
+--- UTF-8 characters of *s*, one string each, for letter spacing.
+local function Chars(s)
+    local out = {}
+    for ch in s:gmatch("[%z\1-\127\194-\244][\128-\191]*") do out[#out + 1] = ch end
+    return out
+end
+
+--- A text copy: its FontStrings, created on *parent* (the holder, or a band's
+--- clip) as they were before letter spacing. One per segment: a whole line, or
+--- a letter when letter spacing or a horizontal gradient needs it placed or
+--- coloured alone.
+local function NewRun(parent, layer)
+    return { parent = parent, layer = layer, fs = {} }
+end
+
+--- Lay *text* out in *run*, each FontString TOPLEFT-anchored to *anchor* at
+--- (ax, ay): lines on rows, segments spaced by *gap* canvas units, each line
+--- centred on the widest. *color* colours the run; *grad* ({a, b}) colours each
+--- letter across the text instead. Returns the run's width and height.
+local function SetRun(run, anchor, ax, ay, text, font, size, gap, color, grad)
+    local perChar = gap ~= 0 or grad ~= nil
+    local lines, total = {}, 0
+    for line in (text .. "\n"):gmatch("(.-)\n") do
+        local segs = perChar and Chars(line) or { line }
+        lines[#lines + 1] = segs
+        total = total + #segs
+    end
+
+    local placed, widths, maxW, lineH = {}, {}, 0, 0
+    local used, k = 0, 0
+    for row, segs in ipairs(lines) do
+        local x = 0
+        for _, seg in ipairs(segs) do
+            used = used + 1
+            k = k + 1
+            local fs = run.fs[used]
+            if not fs then
+                fs = run.parent:CreateFontString(nil, run.layer)
+                fs:SetJustifyH("LEFT")
+                run.fs[used] = fs
+            end
+            fs:SetFont(font, size, "")
+            fs:SetText(seg)
+            if grad then
+                local t = total > 1 and (k - 1) / (total - 1) or 0
+                fs:SetTextColor(grad[1][1] + (grad[2][1] - grad[1][1]) * t,
+                    grad[1][2] + (grad[2][2] - grad[1][2]) * t,
+                    grad[1][3] + (grad[2][3] - grad[1][3]) * t, 1)
+            else
+                fs:SetTextColor(color[1], color[2], color[3], 1)
+            end
+            fs:Show()
+            lineH = math.max(lineH, fs:GetStringHeight())
+            placed[#placed + 1] = { fs = fs, x = x, row = row }
+            x = x + fs:GetStringWidth() + gap
+        end
+        widths[row] = #segs > 0 and x - gap or 0
+        maxW = math.max(maxW, widths[row])
+    end
+    for i = used + 1, #run.fs do run.fs[i]:Hide() end
+    for _, p in ipairs(placed) do
+        p.fs:ClearAllPoints()
+        p.fs:SetPoint("TOPLEFT", anchor, "TOPLEFT",
+            ax + p.x + (maxW - widths[p.row]) / 2, ay - (p.row - 1) * lineH)
+    end
+    return maxW, #lines * lineH
 end
 
 --- One label: a holder frame with its outline copies behind and its text
@@ -86,42 +159,23 @@ local function NewLabel()
     holder:EnableMouse(false)
     local l = { holder = holder, outline = {}, bands = {} }
     for i = 1, #OUTLINE_OFFSETS do
-        l.outline[i] = Text(holder, "BACKGROUND")
+        l.outline[i] = NewRun(holder, "BACKGROUND")
     end
     return l
 end
 
---- Two hex digits of a 0..1 colour channel.
-local function Hex(v)
-    return ("%02x"):format(math.floor(v * 255 + 0.5))
-end
-
---- *name* with each letter in its own colour, from a at the first letter to b
---- at the last. Inline colour codes, so the gradient needs no art.
-local function Inline(name, a, b)
-    local out, n = {}, #name
-    for i = 1, n do
-        local t = n > 1 and (i - 1) / (n - 1) or 0
-        out[i] = "|cff" .. Hex(a[1] + (b[1] - a[1]) * t)
-            .. Hex(a[2] + (b[2] - a[2]) * t) .. Hex(a[3] + (b[3] - a[3]) * t)
-            .. name:sub(i, i) .. "|r"
-    end
-    return table.concat(out)
-end
-
 --- Position and colour one label centred on (x, y) from the canvas's
 --- top-left, at *scale*. The border is copies of the text in the Outline colour,
---- BORDER_RATIO of the font size out.
---- The fill is the Color of its kind, solid or gradient. A horizontal gradient
---- is set in the text itself; a vertical one is BANDS clipped copies, each in
---- its band's colour from the top (Color) to the bottom (Color2). *opaque* is
---- true when the label is drawn at full opacity. Bands blend twice where they
---- meet once a label is translucent, which shows as a line at every seam, so a
---- translucent vertical gradient is one string in the gradient's middle colour
---- instead.
+--- BORDER_RATIO of the font size out. The fill is the Color of its kind, solid
+--- or gradient. A horizontal gradient colours each letter across the label; a
+--- vertical one is BANDS clipped copies, each in its band's colour from the top
+--- (Color) to the bottom (Color2). *opaque* is true when the label is drawn at
+--- full opacity. Bands blend twice where they meet once a label is translucent,
+--- which shows as a line at every seam, so a translucent vertical gradient is
+--- one copy in the gradient's middle colour instead.
 local function Paint(l, label, x, y, scale, opaque)
     local key = KIND[label.kind].color
-    local size = label.h * FONT_PER_H * scale
+    local size = (label.h or DEFAULT_H[label.kind]) * FONT_PER_H * scale
     local a = Config.db[key .. "Color"]
     local b = a
     local dir = "HORIZONTAL"
@@ -133,6 +187,11 @@ local function Paint(l, label, x, y, scale, opaque)
     local vertical = gradient and dir == "VERTICAL"
     local banded = vertical and opaque
     local o = Config.db[key .. "Outline"]
+    local grad = gradient and not vertical and { a, b } or nil
+    local gap = Config.db[key .. "Spacing"] * size
+    local font = FontFor(key)
+    local shown = label.text or label.name
+    if Config.db[key .. "Uppercase"] then shown = shown:upper() end
 
     local slices = 1
     if banded then
@@ -142,30 +201,20 @@ local function Paint(l, label, x, y, scale, opaque)
     end
     while #l.bands < slices do
         local clip = CreateFrame("Frame", nil, l.holder)
-        l.bands[#l.bands + 1] = { clip = clip, fs = Text(clip, "OVERLAY") }
+        l.bands[#l.bands + 1] = { clip = clip, run = NewRun(clip, "OVERLAY") }
     end
 
-    local first = l.bands[1].fs
-    local font = FontFor(key)
-    first:SetFont(font, size, "")
-    first:SetText(label.name)
-    local w, h = first:GetStringWidth(), first:GetStringHeight()
+    local w, h = SetRun(l.bands[1].run, l.holder, 0, 0, shown, font, size, gap, a, grad)
     l.holder:SetSize(w, h)
     l.holder:ClearAllPoints()
     l.holder:SetPoint("CENTER", frame, "TOPLEFT", x, y)
 
     local pad = math.max(2, math.ceil(size * OUTLINE_PAD))
-
     local bw = size * BORDER_RATIO
-    for i, fs in ipairs(l.outline) do
-        fs:SetFont(font, size, "")
-        fs:SetText(label.name)
-        fs:SetTextColor(o[1], o[2], o[3], 1)
-        fs:ClearAllPoints()
-        fs:SetPoint("TOPLEFT", l.holder, "TOPLEFT",
-            OUTLINE_OFFSETS[i][1] * bw, OUTLINE_OFFSETS[i][2] * bw)
+    for i, run in ipairs(l.outline) do
+        SetRun(run, l.holder, OUTLINE_OFFSETS[i][1] * bw, OUTLINE_OFFSETS[i][2] * bw,
+            shown, font, size, gap, o, nil)
     end
-    local inline = gradient and not vertical and Inline(label.name, a, b)
     local overlap = 1 / frame:GetEffectiveScale()
     for i, band in ipairs(l.bands) do
         if i > slices then
@@ -193,15 +242,7 @@ local function Paint(l, label, x, y, scale, opaque)
             band.clip:ClearAllPoints()
             band.clip:SetPoint("TOPLEFT", l.holder, "TOPLEFT", -pad, up - top)
             band.clip:Show()
-            band.fs:SetFont(font, size, "")
-            band.fs:SetText(inline or label.name)
-            if inline then
-                band.fs:SetTextColor(1, 1, 1, 1)
-            else
-                band.fs:SetTextColor(c[1], c[2], c[3], 1)
-            end
-            band.fs:ClearAllPoints()
-            band.fs:SetPoint("TOPLEFT", l.holder, "TOPLEFT")
+            SetRun(band.run, l.holder, 0, 0, shown, font, size, gap, c, grad)
         end
     end
     l.holder:Show()
@@ -212,7 +253,9 @@ end
 --- instead, leaving the fill translucent over the map alone.
 local function Fade(l, alpha)
     local halo = math.max(0, math.min(1, (alpha - 0.5) * 2))
-    for _, fs in ipairs(l.outline) do fs:SetAlpha(halo) end
+    for _, run in ipairs(l.outline) do
+        for _, fs in ipairs(run.fs) do fs:SetAlpha(halo) end
+    end
     for _, band in ipairs(l.bands) do band.clip:SetAlpha(alpha) end
 end
 
@@ -298,22 +341,54 @@ function AreaLabels:Refresh()
         and AREA_LABELS[WorldMapFrame:GetMapID() or 0]
     -- Under Fog of War only explored areas are labelled; continent names always
     -- show. A label's overlay is its area's explored-texture key (see emitter).
+    -- A subzone with no overlay key cannot be checked, so it stays hidden.
     local mapID = WorldMapFrame:GetMapID() or 0
     local fog = Config:FogOfWarEnabled() or Config:WorldFogOfWarEnabled(mapID)
-    local explored
+    local explored, rects
     if fog then
-        explored = {}
+        explored, rects = {}, {}
         for _, t in ipairs(C_MapExplorationInfo.GetExploredMapTextures(mapID) or {}) do
             explored[t.offsetX .. "," .. t.offsetY .. ","
                 .. t.textureWidth .. "," .. t.textureHeight] = true
+            rects[#rects + 1] = t
         end
     end
+    -- Custom labels carry no overlay key: explored when their point lies in an
+    -- explored texture (offsets are in the 1002x668 map space). Maps with no
+    -- exploration overlays (cities) are never fogged.
+    local function CustomExplored(p)
+        if not (rects and (HFWMF_ZONE_OVERLAYS or {})[mapID]) then return true end
+        local x, y = p.u * 1002, p.v * 668
+        for _, t in ipairs(rects) do
+            if x >= t.offsetX and x <= t.offsetX + t.textureWidth
+                and y >= t.offsetY and y <= t.offsetY + t.textureHeight then
+                return true
+            end
+        end
+        return false
+    end
+    local custom, shadowed = {}, {}
+    for _, p in ipairs(all and CUSTOM_LABELS[mapID] or {}) do
+        local k = KIND[p.kind]
+        if p.hide then
+            shadowed[p.kind .. "|" .. p.name] = true
+        elseif Config.db[k.show] and (p.kind == "poi" or Config.db[k.color .. "IncludeCustom"])
+            and (p.kind == "continent" or CustomExplored(p)) then
+            custom[#custom + 1] = p
+            shadowed[p.kind .. "|" .. p.name] = true
+        end
+    end
+    -- A shown custom label, or a hide entry, takes over a same-kind area label
+    -- of the same name on this map. Other kinds coexist.
     for _, label in ipairs(all or {}) do
         if Config.db[KIND[label.kind].show]
-            and (not explored or label.overlay == nil or explored[label.overlay]) then
+            and (not explored or (label.overlay and explored[label.overlay])
+                or (label.overlay == nil and label.kind ~= "subzone"))
+            and not shadowed[label.kind .. "|" .. label.name] then
             labels[#labels + 1] = label
         end
     end
+    for _, p in ipairs(custom) do labels[#labels + 1] = p end
     if #labels == 0 then
         if frame then frame:Hide() end
         return
@@ -339,7 +414,7 @@ function AreaLabels:Refresh()
             l = NewLabel()
             labelFrames[i] = l
         end
-        local alpha = ZoomFade(label.kind)
+        local alpha = ZoomFade(label.kind) * Config.db[KIND[label.kind].color .. "Opacity"]
         Paint(l, label, label.u * w, -label.v * h, AreaLabelScale(label.kind),
             alpha * frameAlpha >= 1)
         Fade(l, alpha)

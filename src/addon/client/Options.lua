@@ -77,7 +77,7 @@ end
 local function NoAreaLabelsOn()
     return not (Config.db.showAreaContinentNames or Config.db.showAreaCapitalCities
         or Config.db.showAreaTownsHubs or Config.db.showAreaSubzoneNames
-        or Config.db.showAreaCityDistricts)
+        or Config.db.showAreaCityDistricts or Config.db.showAreaPOIs)
 end
 
 local SECTION_RESET = "HFWM-SectionReset"  -- registered below, with the widgets
@@ -102,6 +102,12 @@ local AREA_LABEL_KINDS = {
                   fade = "Fades these labels out when the zoom is beyond its "
                       .. "level, to allow you to see detail that would "
                       .. "otherwise be obscured." },
+    poi       = { show = "showAreaPOIs", scale = "poiAreaLabelScale",
+                  color = "poiAreaLabel", noIncludeCustom = true,
+                  base = "townAreaLabelScale",
+                  fade = "Fades these labels out when the zoom is beyond its "
+                      .. "level, to allow you to see detail that would "
+                      .. "otherwise be obscured." },
     district  = { show = "showAreaCityDistricts", scale = "districtAreaLabelScale",
                   auto = "districtAutoScale", color = "districtAreaLabel",
                   fade = "Fades these labels out when the zoom is beyond its "
@@ -113,7 +119,7 @@ local AREA_LABEL_KINDS = {
 local function AreaLabelKeys(k)
     local keys = { k.show, k.scale }
     if k.auto then keys[#keys + 1] = k.auto end
-    for _, suffix in ipairs({ "ColorMode", "Color", "Color2", "GradientDir", "Outline", "Font" }) do
+    for _, suffix in ipairs({ "ColorMode", "Color", "Color2", "GradientDir", "Outline", "Font", "IncludeCustom", "Uppercase", "Spacing", "Opacity" }) do
         keys[#keys + 1] = k.color .. suffix
     end
     if k.fade then
@@ -241,8 +247,11 @@ end
 --- An Area Labels section, boxed like Map Background: an Enabled toggle for one
 --- label kind (*k*, from AREA_LABEL_KINDS), its own Auto-scale, Label scale,
 --- colours and a Reset to defaults.
-local function AreaLabelSection(order, title, k, desc)
+local function AreaLabelGroup(order, title, k, desc)
     local showKey, scaleKey, autoKey, colorKey = k.show, k.scale, k.auto, k.color
+    -- The scale the slider's 100% is relative to: the kind's own default, or
+    -- another kind's (POI reads against the Towns and hubs size).
+    local baseKey = k.base or scaleKey
     return {
         order = order,
         type = "group",
@@ -253,6 +262,7 @@ local function AreaLabelSection(order, title, k, desc)
                 order = 10,
                 type = "toggle",
                 name = "Enabled",
+                width = "half",
                 desc = desc,
                 get = function() return Config.db[showKey] end,
                 set = function(_, value)
@@ -280,6 +290,64 @@ local function AreaLabelSection(order, title, k, desc)
                 width = 1,
                 name = "",
             },
+            includeCustom = {
+                order = 16,
+                type = "toggle",
+                name = "Include Custom",
+                desc = "Includes custom points of interest that exist as "
+                    .. "hand scrawled on the SD map, but are not otherwise "
+                    .. "official classified under this label type for "
+                    .. "display on the HD map. For ex. In-game code declares "
+                    .. "the City of Dalaran to actually be a subzone, with "
+                    .. "this setting enabled, it would be instead classed as "
+                    .. "a true capital city, visa versa.",
+                hidden = function() return k.noIncludeCustom or not Config.db[showKey] end,
+                get = function() return Config.db[colorKey .. "IncludeCustom"] end,
+                set = function(_, value)
+                    Config.db[colorKey .. "IncludeCustom"] = value
+                    ns.AreaLabels:Refresh()
+                end,
+            },
+            uppercase = {
+                order = 17,
+                type = "toggle",
+                name = "Uppercase",
+                desc = "Draws these labels in capital letters.",
+                hidden = function() return not Config.db[showKey] end,
+                get = function() return Config.db[colorKey .. "Uppercase"] end,
+                set = function(_, value)
+                    Config.db[colorKey .. "Uppercase"] = value
+                    ns.AreaLabels:Refresh()
+                end,
+            },
+            spacing = {
+                order = 18,
+                type = "range",
+                name = "Letter spacing",
+                desc = "Space between letters, as a fraction of the label's text "
+                    .. "size. Negative pulls them together.",
+                min = -0.1, max = 0.5, step = 0.01,
+                hidden = function() return not Config.db[showKey] end,
+                get = function() return Config.db[colorKey .. "Spacing"] end,
+                set = function(_, value)
+                    Config.db[colorKey .. "Spacing"] = value
+                    ns.AreaLabels:Refresh()
+                end,
+            },
+            opacity = {
+                order = 19,
+                type = "range",
+                name = "Opacity",
+                desc = "Base opacity of these labels. Zoom fading and the "
+                    .. "map's HD/SD blend apply on top of it.",
+                min = 0, max = 1, step = 0.05, isPercent = true,
+                hidden = function() return not Config.db[showKey] end,
+                get = function() return Config.db[colorKey .. "Opacity"] end,
+                set = function(_, value)
+                    Config.db[colorKey .. "Opacity"] = value
+                    ns.AreaLabels:Refresh()
+                end,
+            },
             zoomFade = {
                 order = 35,
                 width = "full",
@@ -297,13 +365,15 @@ local function AreaLabelSection(order, title, k, desc)
                 order = 20,
                 type = "range",
                 name = "Label scale",
-                desc = "Size of these labels, as a multiple of their default "
+                desc = k.base and "Size of these labels, as a percent of the Towns "
+                    .. "and hubs label size. Applies on top of the Global label scale."
+                    or "Size of these labels, as a multiple of their default "
                     .. "size. Applies on top of the Global label scale.",
                 min = 0.5, max = 2, step = 0.05, isPercent = true,
                 hidden = function() return not Config.db[showKey] end,
-                get = function() return Config.db[scaleKey] / Config.DEFAULTS[scaleKey] end,
+                get = function() return Config.db[scaleKey] / Config.DEFAULTS[baseKey] end,
                 set = function(_, value)
-                    Config.db[scaleKey] = value * Config.DEFAULTS[scaleKey]
+                    Config.db[scaleKey] = value * Config.DEFAULTS[baseKey]
                     ns.AreaLabels:Refresh()
                 end,
             },
@@ -412,6 +482,37 @@ local function AreaLabelSection(order, title, k, desc)
             fade = k.fade and AreaLabelFadeSection(40, k) or nil,
         },
     }
+end
+
+--- An Area Labels section with a collapse button under Enabled. Collapsed, only
+--- Enabled and the button show. The state is saved per section in the profile
+--- (the <color>Collapsed keys in Config.DEFAULTS).
+local function AreaLabelSection(order, title, k, desc)
+    local group = AreaLabelGroup(order, title, k, desc)
+    local key = k.color .. "Collapsed"
+    local function Collapsed() return Config.db[key] end
+    group.args.collapse = {
+        order = 11,
+        type = "execute",
+        width = "half",
+        hidden = function() return not Config.db[k.show] end,
+        name = function() return Collapsed() and "Expand" or "Collapse" end,
+        func = function()
+            Config.db[key] = not Collapsed()
+            ns.Options:Refresh()
+        end,
+    }
+    for name, opt in pairs(group.args) do
+        if name ~= "enabled" and name ~= "collapse" then
+            local hidden = opt.hidden
+            opt.hidden = function(info)
+                if Collapsed() then return true end
+                if type(hidden) == "function" then return hidden(info) end
+                return hidden
+            end
+        end
+    end
+    return group
 end
 
 --- Fog of War only works over Blizzard's own art, which only Hybrid leaves
@@ -857,18 +958,23 @@ local options = {
                         ns.AreaLabels:Refresh()
                     end,
                 },
-                continentAreaLabels = AreaLabelSection(23, "Continents",
+                continentAreaLabels = AreaLabelSection(24, "Continents",
                     AREA_LABEL_KINDS.continent,
                     "Shows the names of continents, such as Eastern "
                         .. "Kingdoms, on their continent maps."),
-                capitalAreaLabels = AreaLabelSection(22, "Capital Cities",
+                capitalAreaLabels = AreaLabelSection(23, "Capital Cities",
                     AREA_LABEL_KINDS.capital,
                     "Shows the names of capital cities, such as "
                         .. "Stormwind and Ironforge."),
-                townAreaLabels = AreaLabelSection(21, "Towns/Hubs",
+                townAreaLabels = AreaLabelSection(22, "Towns/Hubs",
                     AREA_LABEL_KINDS.town,
                     "Shows the names of towns and hubs, such as "
                         .. "Goldshire and Northshire."),
+                poiAreaLabels = AreaLabelSection(21, "Points of Interest",
+                    AREA_LABEL_KINDS.poi,
+                    "Shows labels of areas that are drawn on the SD map, but "
+                        .. "may otherwise exist under a different type "
+                        .. "(subzone, city etc) for the HD map."),
                 subzoneAreaLabels = AreaLabelSection(20, "Subzones",
                     AREA_LABEL_KINDS.subzone,
                     "Shows the names of outdoor areas inside a zone, such as "

@@ -2610,7 +2610,13 @@ function CaveRenderer:ShowCave(floorMapID)
 
     window:SetAlpha(1)
     self:ApplyAlpha()
+    -- The world map's open sound, once per hidden-to-shown change, and only
+    -- when the window is actually on screen (a cave entered with the map
+    -- closed is hidden behind it). Floor switches re-enter here while the
+    -- window is already up, so they stay silent.
+    local wasShown = window:IsShown()
     window:Show()
+    if not wasShown and window:IsVisible() then PlaySound(SOUNDKIT.IG_QUEST_LOG_OPEN) end
 
     Config.caveOverlayActive     = true
     Config.caveCurrentFloorMapID = floorMapID
@@ -2662,6 +2668,8 @@ function CaveRenderer:SelectAllFloors()
 end
 
 function CaveRenderer:HideCave()
+    -- Captured first: the close sound plays only when the window was on screen.
+    local wasVisible = window and window:IsVisible()
     Config.caveOverlayActive     = false
     Config.caveCurrentFloorMapID = nil
     Config.caveAllFloors         = nil
@@ -2686,6 +2694,7 @@ function CaveRenderer:HideCave()
     HideGroupPins(1)
     window:SetScript("OnUpdate", nil)
     window:Hide()
+    if wasVisible then PlaySound(SOUNDKIT.IG_QUEST_LOG_CLOSE) end
 end
 
 --- Re-run the layout against the current map-frame size. Debounced, because
