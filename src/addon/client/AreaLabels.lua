@@ -343,18 +343,34 @@ function AreaLabels:Refresh()
     -- show. A label's overlay is its area's explored-texture key (see emitter).
     local mapID = WorldMapFrame:GetMapID() or 0
     local fog = Config:FogOfWarEnabled() or Config:WorldFogOfWarEnabled(mapID)
-    local explored
+    local explored, rects
     if fog then
-        explored = {}
+        explored, rects = {}, {}
         for _, t in ipairs(C_MapExplorationInfo.GetExploredMapTextures(mapID) or {}) do
             explored[t.offsetX .. "," .. t.offsetY .. ","
                 .. t.textureWidth .. "," .. t.textureHeight] = true
+            rects[#rects + 1] = t
         end
+    end
+    -- Custom labels carry no overlay key: explored when their point lies in an
+    -- explored texture (offsets are in the 1002x668 map space). Maps with no
+    -- exploration overlays (cities) are never fogged.
+    local function CustomExplored(p)
+        if not (rects and (HFWMF_ZONE_OVERLAYS or {})[mapID]) then return true end
+        local x, y = p.u * 1002, p.v * 668
+        for _, t in ipairs(rects) do
+            if x >= t.offsetX and x <= t.offsetX + t.textureWidth
+                and y >= t.offsetY and y <= t.offsetY + t.textureHeight then
+                return true
+            end
+        end
+        return false
     end
     local custom = {}
     for _, p in ipairs(all and CUSTOM_LABELS[mapID] or {}) do
         local k = KIND[p.kind]
-        if Config.db[k.show] and (p.kind == "poi" or Config.db[k.color .. "IncludeCustom"]) then
+        if Config.db[k.show] and (p.kind == "poi" or Config.db[k.color .. "IncludeCustom"])
+            and (p.kind == "continent" or CustomExplored(p)) then
             custom[#custom + 1] = p
         end
     end
