@@ -6,8 +6,9 @@
 -- generated; edit freely.
 --
 -- [uiMapID] = { { name, kind, u, v [, text, h] }, ... }
---   name  the text shown when no text is given. Not matched against
---         AreaLabelData.lua: a same-named label there is shown alongside this one.
+--   name  the text shown when no text is given. Matched against AreaLabelData.lua
+--         by name and kind: a shown custom label hides the same-named area label
+--         of the same kind on that map. Different kinds are shown alongside.
 --   text  optional text shown in place of name, for choosing the line breaks:
 --         "\n" starts a new line.
 --   kind  the category, which sets the style it takes and what shows it:
@@ -115,6 +116,8 @@ HFWMF_CUSTOM_LABELS = {
         { name = "Lethlor Ravine", text = "Lethlor\nRavine", kind = "poi", u = 0.813, v = 0.533 },
         { name = "Dustbelch Grotto", text = "Dustbelch\nGrotto", kind = "poi", u = 0.122, v = 0.832 },
         { name = "Uldaman", kind = "poi", u = 0.480, v = 0.137 },
+        { name = "Kargath", kind = "town", u = 0.099, v = 0.451 },
+        { name = "Angor Fortress", text = "Angor\nFortress", kind = "town", u = 0.482, v = 0.312 },
     },
     [2548] = {
         { name = "Bolder'ok", kind = "poi", u = 0.653, v = 0.109 },

@@ -374,9 +374,14 @@ function AreaLabels:Refresh()
             custom[#custom + 1] = p
         end
     end
+    -- A shown custom label takes over a same-kind area label of the same name
+    -- on this map (a custom town replaces the real town); other kinds coexist.
+    local shadowed = {}
+    for _, p in ipairs(custom) do shadowed[p.kind .. "|" .. p.name] = true end
     for _, label in ipairs(all or {}) do
         if Config.db[KIND[label.kind].show]
-            and (not explored or label.overlay == nil or explored[label.overlay]) then
+            and (not explored or label.overlay == nil or explored[label.overlay])
+            and not shadowed[label.kind .. "|" .. label.name] then
             labels[#labels + 1] = label
         end
     end
