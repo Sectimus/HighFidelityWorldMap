@@ -123,7 +123,7 @@ Config.DEFAULTS = {
     toggleButtonEnabled = true,
     -- "Moveable toggle": lets the button be dragged within the map pane. Its
     -- position (db.toggleButtonPoint, below) is kept either way.
-    toggleButtonMovable = false,
+    toggleButtonMovable = true,
 
     -- The client's own Player and Cursor coordinate readouts on the world
     -- map (Coords.lua), each toggled from Options. On by default, as the
@@ -149,7 +149,7 @@ Config.DEFAULTS = {
     capitalAreaLabelScale = 1.15,
     townAreaLabelScale = 1.3,
     subzoneAreaLabelScale = 0.18,
-    districtAreaLabelScale = 0.8,
+    districtAreaLabelScale = 1.3,
     -- Options' Area Labels sections: collapsed (only Enabled and the button
     -- show) or expanded, remembered per profile.
     continentAreaLabelCollapsed = true,
@@ -236,21 +236,21 @@ Config.DEFAULTS = {
     townAreaLabelFont = "global",
     subzoneAreaLabelFont = "global",
     districtAreaLabelFont = "global",
-    -- Uppercase (Options): draws the label's text in capital letters. On for
-    -- Points of Interest only.
+    -- Uppercase (Options): draws the label's text in capital letters. Off by
+    -- default.
     continentAreaLabelUppercase = false,
     capitalAreaLabelUppercase = false,
     townAreaLabelUppercase = false,
     subzoneAreaLabelUppercase = false,
     districtAreaLabelUppercase = false,
-    poiAreaLabelUppercase = true,
+    poiAreaLabelUppercase = false,
     -- Letter spacing (Options): space between letters, as a fraction of the text
     -- size. 0 is the font's own spacing.
     continentAreaLabelSpacing = 0,
     capitalAreaLabelSpacing = 0,
     townAreaLabelSpacing = 0,
     subzoneAreaLabelSpacing = 0,
-    districtAreaLabelSpacing = 0,
+    districtAreaLabelSpacing = -0.07,
     poiAreaLabelSpacing = 0,
     -- Opacity (Options): base opacity of the type's labels, 0-1. Zoom fade
     -- and the HD blend scale it further.
@@ -271,8 +271,8 @@ Config.DEFAULTS = {
     -- while this type is on (no Include Custom toggle of its own). Defaults
     -- match towns and hubs.
     showAreaPOIs = true,
-    -- 65% of the Towns and hubs scale (1.3), which Options' Label scale reads against.
-    poiAreaLabelScale = 0.845,
+    -- 60% of the Towns and hubs scale (1.3), which Options' Label scale reads against.
+    poiAreaLabelScale = 0.78,
     poiAreaLabelColorMode = "solid",
     poiAreaLabelColor = { 1, 247 / 255, 227 / 255 },
     poiAreaLabelColor2 = { 1, 200 / 255, 90 / 255 },
