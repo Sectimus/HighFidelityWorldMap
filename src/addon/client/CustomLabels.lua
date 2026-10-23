@@ -90,7 +90,6 @@ HFWMF_CUSTOM_LABELS = {
         { name = "Pyrewood Village", text = "Pyrewood\nVillage", kind = "poi", u = 0.471, v = 0.774 },
         { name = "Ambermill", kind = "poi", u = 0.603, v = 0.657 },
         { name = "Fenris Isle", kind = "poi", u = 0.662, v = 0.221 },
-        { name = "Venerous Ale", kind = "poi", u = 0.659, v = 0.219 },
     },
     [1420] = {
         { name = "Shadowvale", kind = "poi", u = 0.143, v = 0.648 },
