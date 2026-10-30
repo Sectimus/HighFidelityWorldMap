@@ -485,6 +485,9 @@ function Commands:Handle(msg)
     elseif cmd == "legend" then
         self:LegendDebug()
         return
+    elseif cmd == "issue" then
+        self:OpenSettingsDialog()
+        return
     elseif cmd == "debug" then
         self:Debug()
         return
@@ -521,6 +524,7 @@ function Commands:Handle(msg)
             .. "raw, unmasked (diagnostic; off removes them)")
         print("  /hfwm icon          - texture/atlas info for the quest-list "
             .. "side-panel toggle button's own artwork")
+        print("  /hfwm issue         - your settings as JSON, for bug reports")
         return
     end
 
@@ -1021,6 +1025,83 @@ function Commands:TaintDebug()
         table.sort(bad)
         out("%s: %s", name, #bad > 0 and table.concat(bad, " ") or "clean")
     end
+end
+
+--- JSON string literal. Only control characters, quotes and backslashes need
+--- escaping; anything else in a setting value passes through unchanged.
+local JSON_ESCAPES = { ['"'] = '\\"', ['\\'] = '\\\\', ['\n'] = '\\n', ['\r'] = '\\r', ['\t'] = '\\t' }
+local function JsonString(s)
+    return '"' .. s:gsub('[%c"\\]', function(c)
+        return JSON_ESCAPES[c] or ("\\u%04x"):format(c:byte())
+    end) .. '"'
+end
+
+--- Pretty-print a settings value as JSON. Only the types AceDB profiles hold
+--- (booleans, numbers, strings, and tables of those) are expected.
+local function JsonValue(v, indent)
+    local t = type(v)
+    if t == "string" then return JsonString(v)
+    elseif t == "number" then return ("%.14g"):format(v)
+    elseif t == "boolean" then return tostring(v)
+    elseif t ~= "table" then return "null" end
+
+    local inner, count, isArray = indent .. "  ", 0, true
+    for k in pairs(v) do
+        count = count + 1
+        if type(k) ~= "number" or k < 1 or k % 1 ~= 0 then isArray = false end
+    end
+    if count == 0 then return "{}" end
+
+    local parts = {}
+    if isArray and count == #v then
+        for i = 1, count do parts[i] = inner .. JsonValue(v[i], inner) end
+        return "[\n" .. table.concat(parts, ",\n") .. "\n" .. indent .. "]"
+    end
+    local keys = {}
+    for k in pairs(v) do keys[#keys + 1] = k end
+    table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+    for i, k in ipairs(keys) do
+        parts[i] = inner .. JsonString(tostring(k)) .. ": " .. JsonValue(v[k], inner)
+    end
+    return "{\n" .. table.concat(parts, ",\n") .. "\n" .. indent .. "}"
+end
+
+--- Every profile setting. AceDB only stores values that differ from defaults,
+--- so read each default key through db (which falls back to the default) and
+--- keep any stored extras not in DEFAULTS (caveWindowPoint, toggleButtonPoint).
+local function SettingsSnapshot()
+    local db, out = Config.db, {}
+    for k, default in pairs(Config.DEFAULTS) do
+        local v = db[k]
+        if v == nil then v = default end
+        out[k] = v
+    end
+    for k, v in pairs(db) do
+        if out[k] == nil then out[k] = v end
+    end
+    return out
+end
+
+--- /hfwm issue: the settings as JSON in an editable box, so the user can copy
+--- them into a bug report.
+function Commands:OpenSettingsDialog()
+    local AceGUI = LibStub("AceGUI-3.0")
+    local frame = AceGUI:Create("Frame")
+    frame:SetTitle("High Fidelity World Map settings")
+    frame:SetStatusText("Copy this JSON into your bug report.")
+    frame:SetWidth(560)
+    frame:SetHeight(460)
+    frame:SetLayout("Fill")
+    frame:SetCallback("OnClose", function(widget) AceGUI:Release(widget) end)
+
+    local box = AceGUI:Create("MultiLineEditBox")
+    box:SetLabel("Settings (JSON)")
+    box:SetMaxLetters(0)
+    box:SetNumLines(20)
+    box:DisableButton(true)
+    box:SetText(JsonValue(SettingsSnapshot(), ""))
+    frame:AddChild(box)
+    box:SetFocus()
 end
 
 --- Register /hfwm and /hfwmforever through AceConsole-3.0.
