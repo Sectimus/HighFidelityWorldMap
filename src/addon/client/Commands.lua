@@ -123,16 +123,17 @@ function Commands:Handle(msg)
         return
     elseif cmd == "zoom" then
         local want = args[2]
-        local value
-        if want == "on" then value = true
-        elseif want == "off" then value = false
-        else value = not db.additionalZoomLevels end
-        ns.Options:SetExperimental("additionalZoomLevels", value,
-            "Additional zoom levels", function(on)
-                ns.ZoomLevels:Refresh()
-                P(("Additional zoom levels: %s"):format(
-                    on and "|cff00ff00on|r" or "|cffff4444off|r"))
-            end)
+        if want == "on" then
+            db.additionalZoomLevels = true
+        elseif want == "off" then
+            db.additionalZoomLevels = false
+        else
+            db.additionalZoomLevels = not db.additionalZoomLevels
+        end
+        ns.ZoomLevels:Refresh()
+        P(("Additional zoom levels: %s"):format(
+            db.additionalZoomLevels and "|cff00ff00on|r" or "|cffff4444off|r"))
+        ns.Options:Refresh()
         return
     elseif cmd == "clarity" then
         local want = args[2]

@@ -91,9 +91,8 @@ Config.DEFAULTS = {
 
     -- Appends 8 extra, closer zoom steps onto the world map so the
     -- native-resolution zone art this addon ships can be zoomed into past
-    -- Blizzard's own ceiling. Off by default: it writes Blizzard's scroll
-    -- container and taints it. See ZoomLevels.lua.
-    additionalZoomLevels = false,
+    -- Blizzard's own ceiling. On by default. See ZoomLevels.lua.
+    additionalZoomLevels = true,
 
     -- Draws the three continent/world maps (Kalimdor, Eastern Kingdoms,
     -- Azeroth) from the Art addon's hi-res tile grid instead of the low
@@ -1050,9 +1049,9 @@ function Config:RefreshProfile()
     ns.AreaLabels:Refresh()
 end
 
---- Experimental zoom settings used to default on. Turn them off once, for
---- every saved profile, so existing users stop hitting the taint. The
---- global marker makes it one-time: a user who re-enables one after the
+--- Remember zoom+pan and Keep Centered used to default on. Turn them off
+--- once, for every saved profile, so existing users stop hitting the taint.
+--- The global marker makes it one-time: a user who re-enables one after the
 --- confirmation popup keeps that choice on later loads.
 local MIGRATION_EXPERIMENTAL_OFF = 1
 local function MigrateExperimentalDefaults(dbObj)
@@ -1060,7 +1059,6 @@ local function MigrateExperimentalDefaults(dbObj)
     if (global.migrations or 0) >= MIGRATION_EXPERIMENTAL_OFF then return end
     for _, profile in pairs(dbObj.profiles) do
         profile.rememberMapZoomPan = false
-        profile.additionalZoomLevels = false
         profile.keepCentered = false
     end
     global.migrations = MIGRATION_EXPERIMENTAL_OFF
