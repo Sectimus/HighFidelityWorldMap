@@ -742,6 +742,40 @@ StaticPopupDialogs["HFWM_RESET_PAGE"] = {
     preferredIndex = 3,
 }
 
+-- EXPERIMENTAL settings write Blizzard's scroll container and are known to
+-- taint it. Turning one on asks first: nothing is written unless the user
+-- confirms. Turning one off is immediate.
+StaticPopupDialogs["HFWM_EXPERIMENTAL"] = {
+    text = "%s is EXPERIMENTAL and known to cause taint, with no current "
+        .. "known workaround.\n\nEnable it anyway?",
+    button1 = ENABLE,
+    button2 = CANCEL,
+    OnAccept = function(_, pending)
+        Config.db[pending.key] = true
+        if pending.onChange then pending.onChange(true) end
+        Options:Refresh()
+    end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+}
+
+--- Writes an EXPERIMENTAL setting. Turning it on opens the confirmation
+--- popup and leaves the saved value alone until the user accepts. Turning
+--- it off applies at once. *onChange(value)* runs after the write.
+function Options:SetExperimental(key, value, label, onChange)
+    if value then
+        StaticPopup_Show("HFWM_EXPERIMENTAL", label, nil, { key = key, onChange = onChange })
+        -- The checkbox already shows the new state; redraw it from the saved value.
+        self:Refresh()
+        return
+    end
+    Config.db[key] = false
+    if onChange then onChange(false) end
+    self:Refresh()
+end
+
 local options = {
     type = "group",
     name = PANEL_TITLE,
@@ -769,42 +803,47 @@ local options = {
         rememberMapZoomPan = {
             order = 40,
             type = "toggle",
-            name = "Remember zoom+pan",
+            name = "Remember zoom+pan |cffff8800(Experimental)|r",
             desc = "Keeps the world map at the zoom and pan you left it "
                 .. "at when you reopen it on the same map. A different "
                 .. "map (you travelled, or were looking elsewhere) opens "
-                .. "on your current zone as usual.",
+                .. "on your current zone as usual.\n\n|cffff8800EXPERIMENTAL: "
+                .. "known to cause taint, with no current known workaround.|r",
             get = function() return Config.db.rememberMapZoomPan end,
             set = function(_, value)
-                Config.db.rememberMapZoomPan = value
-                if not value then ns.MapMemory:Clear() end
+                Options:SetExperimental("rememberMapZoomPan", value,
+                    "Remember zoom+pan", function(on)
+                        if not on then ns.MapMemory:Clear() end
+                    end)
             end,
         },
         additionalZoomLevels = {
             order = 50,
             type = "toggle",
-            name = "Additional zoom levels",
+            name = "Additional zoom levels |cffff8800(Experimental)|r",
             desc = "Lets the world map zoom eight steps closer than the "
-                .. "client's own maximum.\n\n|cffff8800Does not currently work "
-                .. "with the Gamepad UI: its map code uses a different "
-                .. "Blizzard API, and adding zoom levels there causes "
+                .. "client's own maximum.\n\n|cffff8800EXPERIMENTAL: known to "
+                .. "cause taint, with no current known workaround.\n\nDoes not "
+                .. "currently work with the Gamepad UI: its map code uses a "
+                .. "different Blizzard API, and adding zoom levels there causes "
                 .. "taint.|r",
             get = function() return Config.db.additionalZoomLevels end,
             set = function(_, value)
-                Config.db.additionalZoomLevels = value
-                ns.ZoomLevels:Refresh()
+                Options:SetExperimental("additionalZoomLevels", value,
+                    "Additional zoom levels", function() ns.ZoomLevels:Refresh() end)
             end,
         },
         keepCentered = {
             order = 55,
             type = "toggle",
-            name = "Keep Centered",
+            name = "Keep Centered |cffff8800(Experimental)|r",
             desc = "Pans the world map as you move so your arrow stays "
-                .. "in the center of it.",
+                .. "in the center of it.\n\n|cffff8800EXPERIMENTAL: known to "
+                .. "cause taint, with no current known workaround.|r",
             get = function() return Config.db.keepCentered end,
             set = function(_, value)
-                Config.db.keepCentered = value
-                ns.KeepCentered:Refresh()
+                Options:SetExperimental("keepCentered", value,
+                    "Keep Centered", function() ns.KeepCentered:Refresh() end)
             end,
         },
         fadeWhenMoving = {
