@@ -814,7 +814,7 @@ local options = {
         rememberMapZoomPan = {
             order = 40,
             type = "toggle",
-            name = "Remember zoom+pan |cffff8800(Experimental)|r",
+            name = "|cffff8800!|r Remember zoom+pan",
             desc = "Keeps the world map at the zoom and pan you left it "
                 .. "at when you reopen it on the same map. A different "
                 .. "map (you travelled, or were looking elsewhere) opens "
@@ -831,7 +831,7 @@ local options = {
         additionalZoomLevels = {
             order = 50,
             type = "toggle",
-            name = "Additional zoom levels |cffff8800(Experimental)|r",
+            name = "|cffff8800!|r Additional zoom levels",
             desc = "Lets the world map zoom eight steps closer than the "
                 .. "client's own maximum.\n\n|cffff8800EXPERIMENTAL: known to "
                 .. "cause taint, with no current known workaround.\n\nDoes not "
@@ -847,7 +847,7 @@ local options = {
         keepCentered = {
             order = 55,
             type = "toggle",
-            name = "Keep Centered |cffff8800(Experimental)|r",
+            name = "|cffff8800!|r Keep Centered",
             desc = "Pans the world map as you move so your arrow stays "
                 .. "in the center of it.\n\n|cffff8800EXPERIMENTAL: known to "
                 .. "cause taint, with no current known workaround.|r",
