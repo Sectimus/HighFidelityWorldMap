@@ -98,7 +98,7 @@ local AREA_LABEL_KINDS = {
                       .. "level, to allow you to see detail that would "
                       .. "otherwise be obscured." },
     subzone   = { show = "showAreaSubzoneNames", scale = "subzoneAreaLabelScale",
-                  color = "subzoneAreaLabel",
+                  color = "subzoneAreaLabel", maxScale = 4,
                   fade = "Fades these labels out when the zoom is beyond its "
                       .. "level, to allow you to see detail that would "
                       .. "otherwise be obscured." },
@@ -380,7 +380,7 @@ local function AreaLabelGroup(order, title, k, desc)
                     .. "and hubs label size. Applies on top of the Global label scale."
                     or "Size of these labels, as a multiple of their default "
                     .. "size. Applies on top of the Global label scale.",
-                min = 0.5, max = 2, step = 0.05, isPercent = true,
+                min = 0.5, max = k.maxScale or 2, step = 0.05, isPercent = true,
                 hidden = function() return not Config.db[showKey] end,
                 get = function() return Config.db[scaleKey] / Config.DEFAULTS[baseKey] end,
                 set = function(_, value)
