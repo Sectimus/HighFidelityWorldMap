@@ -16,7 +16,7 @@ Not just individual zones, continents too! With full control and various customi
 
 ## Increased zoom distance:
 
-With all this new fidelity, the game's base zoom modifier becomes somewhat limiting, so additional zoom levels are now included!
+With all this new fidelity, the game's base zoom modifier becomes somewhat limiting, so an experimental additional zoom levels option is included (off by default, known to cause taint)!
 
 ![Zoom 1](https://i.postimg.cc/3kXr6cc5/zoom-1.jpg)
 
