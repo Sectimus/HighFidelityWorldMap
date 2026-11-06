@@ -1170,6 +1170,12 @@ local options = {
             inline = true,
             name = "|cffff8800!|r Instance map",
             args = {
+                intro = {
+                    order = 0,
+                    type = "description",
+                    name = "|cffff8800!|r This is an experimental feature. Use it "
+                        .. "with caution.\n",
+                },
                 instanceDungeonEnabled = {
                     order = 10,
                     type = "toggle",
