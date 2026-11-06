@@ -98,7 +98,7 @@ local AREA_LABEL_KINDS = {
                       .. "level, to allow you to see detail that would "
                       .. "otherwise be obscured." },
     subzone   = { show = "showAreaSubzoneNames", scale = "subzoneAreaLabelScale",
-                  color = "subzoneAreaLabel",
+                  color = "subzoneAreaLabel", maxScale = 4,
                   fade = "Fades these labels out when the zoom is beyond its "
                       .. "level, to allow you to see detail that would "
                       .. "otherwise be obscured." },
@@ -153,18 +153,19 @@ local function DiffersFromDefaults(keys)
 end
 
 --- The fade settings of one fading label kind (*k*), as a subsection of its Area
---- Labels section. Hidden while its Fade when zoomed is off.
+--- Labels section. Fully visible at always applies; Fully invisible at and the
+--- intensities show only while Fade when zoomed is on.
 local function AreaLabelFadeSection(order, k)
     local showKey, colorKey = k.show, k.color
-    local function FadeOff()
-        return not Config.db[showKey] or not Config.db[colorKey .. "ZoomFade"]
+    local function ZoomOff()
+        return not Config.db[colorKey .. "ZoomFade"]
     end
     return {
         order = order,
         type = "group",
         inline = true,
         name = "Fade",
-        hidden = function() return not Config.db[showKey] or not Config.db[colorKey .. "ZoomFade"] end,
+        hidden = function() return not Config.db[showKey] end,
         args = {
             fadeVisibleAt = {
                 order = 1,
@@ -172,15 +173,13 @@ local function AreaLabelFadeSection(order, k)
                 name = "Fully visible at",
                 desc = "What zoom level should this label type be fully visible at?\n"
                     .. "0 is fully zoomed out (default view)\n"
-                    .. "3 is the default fully zoomed in\n"
-                    .. "11 is the max zoom level you can zoom in to when the \"Additional zoom levels\" setting is enabled.",
-                disabled = FadeOff,
+                    .. "4 is the max zoom level you can zoom in to, or 11 when the \"Additional zoom levels\" setting is enabled.",
                 min = 0, max = 11, step = 1,
-                get = function() return Config.db[colorKey .. "FadeVisibleAt"] end,
+                get = function() return Config:FadeStep(colorKey .. "FadeVisibleAt") end,
                 set = function(_, value)
                     -- Ends must differ: equal values would make the fade undefined.
                     -- A clash keeps the stored value; the handle still follows the drag.
-                    if value == Config.db[colorKey .. "FadeInvisibleAt"] then return end
+                    if value == Config:FadeStep(colorKey .. "FadeInvisibleAt") then return end
                     Config.db[colorKey .. "FadeVisibleAt"] = value
                     ns.AreaLabels:Refresh()
                 end,
@@ -191,15 +190,15 @@ local function AreaLabelFadeSection(order, k)
                 name = "Fully invisible at",
                 desc = "What zoom level should this label type be fully invisible at?\n"
                     .. "0 is fully zoomed out (default view)\n"
-                    .. "3 is the default fully zoomed in\n"
-                    .. "11 is the max zoom level you can zoom in to when the \"Additional zoom levels\" setting is enabled.",
-                disabled = FadeOff,
+                    .. "3 is the lowest value, and 4 is the max zoom level you can zoom in to, or 11 when the \"Additional zoom levels\" setting is enabled.",
+                hidden = ZoomOff,
                 min = 0, max = 11, step = 1,
-                get = function() return Config.db[colorKey .. "FadeInvisibleAt"] end,
+                get = function() return math.max(Config:FadeStep(colorKey .. "FadeInvisibleAt"), Config.db.additionalZoomLevels and 0 or 3) end,
                 set = function(_, value)
                     -- Ends must differ: equal values would make the fade undefined.
                     -- A clash keeps the stored value; the handle still follows the drag.
-                    if value == Config.db[colorKey .. "FadeVisibleAt"] then return end
+                    value = math.max(value, Config.db.additionalZoomLevels and 0 or 3)
+                    if value == Config:FadeStep(colorKey .. "FadeVisibleAt") then return end
                     Config.db[colorKey .. "FadeInvisibleAt"] = value
                     ns.AreaLabels:Refresh()
                 end,
@@ -209,6 +208,7 @@ local function AreaLabelFadeSection(order, k)
                 type = "group",
                 inline = true,
                 name = "",
+                hidden = ZoomOff,
                 args = {
                     fadeInSpeed = {
                         order = 1,
@@ -216,7 +216,6 @@ local function AreaLabelFadeSection(order, k)
                         name = "Fade-in intensity",
                         desc = "How harsh the fade-in animation is, lower value will make "
                             .. "the text visible for longer before switching states",
-                        disabled = FadeOff,
                         min = 0, max = 2, step = 0.05,
                         get = function() return Config.db[colorKey .. "FadeInSpeed"] end,
                         set = function(_, value)
@@ -230,7 +229,6 @@ local function AreaLabelFadeSection(order, k)
                         name = "Fade-out intensity",
                         desc = "How harsh the fade-out animation is, lower value will make "
                             .. "the text visible for longer before switching states",
-                        disabled = FadeOff,
                         min = 0, max = 2, step = 0.05,
                         get = function() return Config.db[colorKey .. "FadeOutSpeed"] end,
                         set = function(_, value)
@@ -320,6 +318,20 @@ local function AreaLabelGroup(order, title, k, desc)
                     ns.AreaLabels:Refresh()
                 end,
             },
+            overrideSubzones = k.noIncludeCustom and {
+                order = 19,
+                type = "toggle",
+                name = "Override subzones",
+                desc = "Hides a subzone label when a point of interest with the same "
+                    .. "name is also shown, so the name is only drawn once. For ex. "
+                    .. "Eastvale Logging Camp is both.",
+                hidden = function() return not Config.db[showKey] end,
+                get = function() return Config.db.poiOverrideSubzones end,
+                set = function(_, value)
+                    Config.db.poiOverrideSubzones = value
+                    ns.AreaLabels:Refresh()
+                end,
+            } or nil,
             spacing = {
                 order = 18,
                 type = "range",
@@ -369,7 +381,7 @@ local function AreaLabelGroup(order, title, k, desc)
                     .. "and hubs label size. Applies on top of the Global label scale."
                     or "Size of these labels, as a multiple of their default "
                     .. "size. Applies on top of the Global label scale.",
-                min = 0.5, max = 2, step = 0.05, isPercent = true,
+                min = 0.5, max = k.maxScale or 2, step = 0.05, isPercent = true,
                 hidden = function() return not Config.db[showKey] end,
                 get = function() return Config.db[scaleKey] / Config.DEFAULTS[baseKey] end,
                 set = function(_, value)
@@ -742,6 +754,40 @@ StaticPopupDialogs["HFWM_RESET_PAGE"] = {
     preferredIndex = 3,
 }
 
+-- EXPERIMENTAL settings write Blizzard's scroll container and are known to
+-- taint it. Turning one on asks first: nothing is written unless the user
+-- confirms. Turning one off is immediate.
+StaticPopupDialogs["HFWM_EXPERIMENTAL"] = {
+    text = "%s is EXPERIMENTAL and known to cause taint, with no current "
+        .. "known workaround.\n\nEnable it anyway?",
+    button1 = ENABLE,
+    button2 = CANCEL,
+    OnAccept = function(_, pending)
+        Config.db[pending.key] = true
+        if pending.onChange then pending.onChange(true) end
+        Options:Refresh()
+    end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+}
+
+--- Writes an EXPERIMENTAL setting. Turning it on opens the confirmation
+--- popup and leaves the saved value alone until the user accepts. Turning
+--- it off applies at once. *onChange(value)* runs after the write.
+function Options:SetExperimental(key, value, label, onChange)
+    if value then
+        StaticPopup_Show("HFWM_EXPERIMENTAL", label, nil, { key = key, onChange = onChange })
+        -- The checkbox already shows the new state; redraw it from the saved value.
+        self:Refresh()
+        return
+    end
+    Config.db[key] = false
+    if onChange then onChange(false) end
+    self:Refresh()
+end
+
 local options = {
     type = "group",
     name = PANEL_TITLE,
@@ -751,6 +797,12 @@ local options = {
             type = "description",
             name = "Satellite world map stitched from the game's own "
                 .. "minimap terrain tiles.\n",
+        },
+        legend = {
+            order = 2,
+            type = "description",
+            fontSize = "small",
+            name = "|cff999999Note: a setting declared with |r|cffff8800!|r|cff999999 is marked as still being in-development, and as such is \"experimental\".|r\n",
         },
         enabled = {
             order = 10,
@@ -769,42 +821,47 @@ local options = {
         rememberMapZoomPan = {
             order = 40,
             type = "toggle",
-            name = "Remember zoom+pan",
+            name = "|cffff8800!|r Remember zoom+pan",
             desc = "Keeps the world map at the zoom and pan you left it "
                 .. "at when you reopen it on the same map. A different "
                 .. "map (you travelled, or were looking elsewhere) opens "
-                .. "on your current zone as usual.",
+                .. "on your current zone as usual.\n\n|cffff8800EXPERIMENTAL: "
+                .. "known to cause taint, with no current known workaround.|r",
             get = function() return Config.db.rememberMapZoomPan end,
             set = function(_, value)
-                Config.db.rememberMapZoomPan = value
-                if not value then ns.MapMemory:Clear() end
+                Options:SetExperimental("rememberMapZoomPan", value,
+                    "Remember zoom+pan", function(on)
+                        if not on then ns.MapMemory:Clear() end
+                    end)
             end,
         },
         additionalZoomLevels = {
             order = 50,
             type = "toggle",
-            name = "Additional zoom levels",
+            name = "|cffff8800!|r Additional zoom levels",
             desc = "Lets the world map zoom eight steps closer than the "
-                .. "client's own maximum.\n\n|cffff8800Does not currently work "
-                .. "with the Gamepad UI: its map code uses a different "
-                .. "Blizzard API, and adding zoom levels there causes "
+                .. "client's own maximum.\n\n|cffff8800EXPERIMENTAL: known to "
+                .. "cause taint, with no current known workaround.\n\nDoes not "
+                .. "currently work with the Gamepad UI: its map code uses a "
+                .. "different Blizzard API, and adding zoom levels there causes "
                 .. "taint.|r",
             get = function() return Config.db.additionalZoomLevels end,
             set = function(_, value)
-                Config.db.additionalZoomLevels = value
-                ns.ZoomLevels:Refresh()
+                Options:SetExperimental("additionalZoomLevels", value,
+                    "Additional zoom levels", function() ns.ZoomLevels:Refresh() end)
             end,
         },
         keepCentered = {
             order = 55,
             type = "toggle",
-            name = "Keep Centered",
+            name = "|cffff8800!|r Keep Centered",
             desc = "Pans the world map as you move so your arrow stays "
-                .. "in the center of it.",
+                .. "in the center of it.\n\n|cffff8800EXPERIMENTAL: known to "
+                .. "cause taint, with no current known workaround.|r",
             get = function() return Config.db.keepCentered end,
             set = function(_, value)
-                Config.db.keepCentered = value
-                ns.KeepCentered:Refresh()
+                Options:SetExperimental("keepCentered", value,
+                    "Keep Centered", function() ns.KeepCentered:Refresh() end)
             end,
         },
         fadeWhenMoving = {
@@ -1072,7 +1129,7 @@ local options = {
                 caveOtherIndoors = {
                     order = 37,
                     type = "toggle",
-                    name = "Other indoors (beta)",
+                    name = "|cffff8800!|r Other indoors",
                     desc = "Also opens the cave map inside buildings, "
                         .. "houses and every other indoor area, not just "
                         .. "caves, mines and dungeons.",
@@ -1118,8 +1175,14 @@ local options = {
             order = 85,
             type = "group",
             inline = true,
-            name = "Instance map (beta)",
+            name = "|cffff8800!|r Instance map",
             args = {
+                intro = {
+                    order = 0,
+                    type = "description",
+                    name = "|cffff8800!|r This is an experimental feature. Use it "
+                        .. "with caution.\n",
+                },
                 instanceDungeonEnabled = {
                     order = 10,
                     type = "toggle",
@@ -1323,7 +1386,7 @@ local SUB_PAGES = {
       keys = { "caveEnabled", "caveAutoOpen", "caveRememberState",
                "caveKeepOpen", "cavePlacement", "caveOtherIndoors",
                "caveAlpha", "caveWindowScale", "caveWindowPoint" } },
-    { key = "instance", title = "Instance Map (beta)",
+    { key = "instance", title = "|cffff8800!|r Instance Map",
       keys = { "instanceDungeonEnabled", "instanceRaidEnabled" } },
     { key = "profiles", title = "Profiles" },
 }

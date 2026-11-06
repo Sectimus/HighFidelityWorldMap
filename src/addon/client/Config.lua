@@ -55,7 +55,7 @@ Config.DEFAULTS = {
     caveOtherIndoors  = false,
 
     -- Instance map: the same window inside dungeon ("party") and raid
-    -- instances, independent of caveEnabled. Off by default (beta).
+    -- instances, independent of caveEnabled. Off by default.
     instanceDungeonEnabled = false,
     instanceRaidEnabled    = false,
 
@@ -81,8 +81,9 @@ Config.DEFAULTS = {
 
     -- Keep the world map at whatever zoom and pan it was left at, instead
     -- of resetting to the current zone every time it reopens -- the same
-    -- job the separate PersistentWorldMap addon does. See MapMemory.lua.
-    rememberMapZoomPan = true,
+    -- job the separate PersistentWorldMap addon does. Off by default: it
+    -- writes Blizzard's scroll container and taints it. See MapMemory.lua.
+    rememberMapZoomPan = false,
 
     -- Pans the world map to follow the player's arrow so it stays centered
     -- on screen. Off by default. See KeepCentered.lua.
@@ -90,8 +91,9 @@ Config.DEFAULTS = {
 
     -- Appends 8 extra, closer zoom steps onto the world map so the
     -- native-resolution zone art this addon ships can be zoomed into past
-    -- Blizzard's own ceiling. On by default. See ZoomLevels.lua.
-    additionalZoomLevels = true,
+    -- Blizzard's own ceiling. EXPERIMENTAL: writes Blizzard's scroll
+    -- container and taints it. Off by default. See ZoomLevels.lua.
+    additionalZoomLevels = false,
 
     -- Draws the three continent/world maps (Kalimdor, Eastern Kingdoms,
     -- Azeroth) from the Art addon's hi-res tile grid instead of the low
@@ -146,9 +148,9 @@ Config.DEFAULTS = {
     -- Per-type label scales, each on top of areaLabelScale. Stored as the actual
     -- multiplier; the Options sliders show each as a percent of its default.
     continentAreaLabelScale = 1,
-    capitalAreaLabelScale = 1.15,
+    capitalAreaLabelScale = 1.35,
     townAreaLabelScale = 1.3,
-    subzoneAreaLabelScale = 0.18,
+    subzoneAreaLabelScale = 0.36,
     districtAreaLabelScale = 1.3,
     -- Options' Area Labels sections: collapsed (only Enabled and the button
     -- show) or expanded, remembered per profile.
@@ -158,6 +160,8 @@ Config.DEFAULTS = {
     subzoneAreaLabelCollapsed = true,
     districtAreaLabelCollapsed = true,
     poiAreaLabelCollapsed = true,
+    -- POI section: hide a subzone label when a POI label of the same name is drawn.
+    poiOverrideSubzones = true,
     -- Auto-scale per label type: labels grow as you zoom out and shrink as you
     -- zoom in, from their label scale at the loosest zoom step. See
     -- AreaLabels.lua's AreaLabelScale.
@@ -214,8 +218,8 @@ Config.DEFAULTS = {
     townAreaLabelFadeInSpeed = 1,
     townAreaLabelFadeOutSpeed = 1,
     subzoneAreaLabelZoomFade = true,
-    subzoneAreaLabelFadeVisibleAt = 11,
-    subzoneAreaLabelFadeInvisibleAt = 3,
+    subzoneAreaLabelFadeVisibleAt = 3,
+    subzoneAreaLabelFadeInvisibleAt = 1,
     subzoneAreaLabelFadeInSpeed = 1,
     subzoneAreaLabelFadeOutSpeed = 1,
     -- Districts fade out like capitals and towns, on by default.
@@ -232,10 +236,10 @@ Config.DEFAULTS = {
     -- <color>Font is a path of its own, or "global" to follow the Global Font.
     areaLabelFont = "Fonts\\FRIZQT__.TTF",
     continentAreaLabelFont = "global",
-    capitalAreaLabelFont = "global",
+    capitalAreaLabelFont = "Fonts\\SKURRI.TTF",
     townAreaLabelFont = "global",
     subzoneAreaLabelFont = "global",
-    districtAreaLabelFont = "global",
+    districtAreaLabelFont = "Fonts\\SKURRI.TTF",
     -- Uppercase (Options): draws the label's text in capital letters. Off by
     -- default.
     continentAreaLabelUppercase = false,
@@ -247,7 +251,7 @@ Config.DEFAULTS = {
     -- Letter spacing (Options): space between letters, as a fraction of the text
     -- size. 0 is the font's own spacing.
     continentAreaLabelSpacing = 0,
-    capitalAreaLabelSpacing = 0,
+    capitalAreaLabelSpacing = 0.1,
     townAreaLabelSpacing = 0,
     subzoneAreaLabelSpacing = 0,
     districtAreaLabelSpacing = -0.07,
@@ -257,7 +261,7 @@ Config.DEFAULTS = {
     continentAreaLabelOpacity = 1,
     capitalAreaLabelOpacity = 1,
     townAreaLabelOpacity = 1,
-    subzoneAreaLabelOpacity = 1,
+    subzoneAreaLabelOpacity = 0.8,
     districtAreaLabelOpacity = 1,
     poiAreaLabelOpacity = 1,
     -- Include Custom (CustomLabels.lua): per type, also show the hand-kept
@@ -278,13 +282,25 @@ Config.DEFAULTS = {
     poiAreaLabelColor2 = { 1, 200 / 255, 90 / 255 },
     poiAreaLabelGradientDir = "VERTICAL",
     poiAreaLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
-    poiAreaLabelZoomFade = true,
-    poiAreaLabelFadeVisibleAt = 0,
+    poiAreaLabelZoomFade = false,
+    poiAreaLabelFadeVisibleAt = 1,
     poiAreaLabelFadeInvisibleAt = 3,
     poiAreaLabelFadeInSpeed = 1,
     poiAreaLabelFadeOutSpeed = 1,
     poiAreaLabelFont = "global",
 }
+
+--- Highest zoom ladder step a fade end may use: 11 with Additional zoom
+--- levels, otherwise 4. Stored fade ends are clamped to it on read, so a
+--- value set while Additional zoom levels was on comes back when re-enabled.
+function Config:FadeStepMax()
+    return (self.db and self.db.additionalZoomLevels) and 11 or 4
+end
+
+--- A fade end (*key*, a Config.db field) clamped to FadeStepMax.
+function Config:FadeStep(key)
+    return math.min(self.db[key], self:FadeStepMax())
+end
 
 --- Fonts the Area Labels can use, in dropdown order. Blizzard ships these
 --- with every client (the game swaps in a locale font where it must).
@@ -1048,6 +1064,23 @@ function Config:RefreshProfile()
     ns.AreaLabels:Refresh()
 end
 
+--- Remember zoom+pan, Keep Centered and Additional zoom levels used to default
+--- on. Turn them off once, for every saved profile, so existing users stop
+--- hitting the taint, including anyone who turned one on by hand before.
+--- The global marker makes it one-time per version: a user who re-enables one
+--- after the confirmation popup keeps that choice until the marker is bumped.
+local MIGRATION_EXPERIMENTAL_OFF = 2
+local function MigrateExperimentalDefaults(dbObj)
+    local global = dbObj.global
+    if (global.migrations or 0) >= MIGRATION_EXPERIMENTAL_OFF then return end
+    for _, profile in pairs(dbObj.profiles) do
+        profile.rememberMapZoomPan = false
+        profile.keepCentered = false
+        profile.additionalZoomLevels = false
+    end
+    global.migrations = MIGRATION_EXPERIMENTAL_OFF
+end
+
 --- Create the AceDB-3.0 database after ADDON_LOADED (see Core.lua's
 --- OnInitialize). `true` as the default profile shares one profile across
 --- every character by default, matching this addon's behavior before
@@ -1070,4 +1103,5 @@ function Config:InitDB()
 
     self.db = self.dbObj.profile
     MigrateBackgroundKeys(self.db)
+    MigrateExperimentalDefaults(self.dbObj)
 end

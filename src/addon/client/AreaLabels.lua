@@ -297,19 +297,19 @@ local function LadderStep()
     return #levels - 1
 end
 
---- Opacity of a label of *kind* from zoom. 1 when the kind has no Fade when
---- zoomed, or it is off. Fully visible at the kind's Fully visible step and
---- fully hidden at its Fully invisible step, whichever order they come in
---- (the order sets the direction). Fade speed bends the curve between them:
---- 1 is linear; higher starts the change sooner and eases in at the far end;
---- lower holds the label until just before that end.
+--- Opacity of a label of *kind* from zoom. With Fade when zoomed on: fully
+--- visible at the kind's Fully visible step and fully hidden at its Fully
+--- invisible step, whichever order they come in (the order sets the direction).
+--- Fade speed bends the curve between them: 1 is linear; higher starts the
+--- change sooner and eases in at the far end; lower holds the label until just
+--- before that end. With it off, the label shows at every zoom.
 local function ZoomFade(kind)
     local key = KIND[kind].color
-    if not Config.db[key .. "ZoomFade"] then return 1 end
     local step = LadderStep()
     step = step or 0 -- ladder not built yet: the zone view's default is level 0
-    local vis = Config.db[key .. "FadeVisibleAt"]
-    local inv = Config.db[key .. "FadeInvisibleAt"]
+    local vis = Config:FadeStep(key .. "FadeVisibleAt")
+    if not Config.db[key .. "ZoomFade"] then return 1 end
+    local inv = Config:FadeStep(key .. "FadeInvisibleAt")
     if vis == inv then return step >= vis and 1 or 0 end
     if inv > vis and step < vis then
         -- Below the visible step, a fade-out label fades in from nothing at step 0
@@ -389,6 +389,19 @@ function AreaLabels:Refresh()
         end
     end
     for _, p in ipairs(custom) do labels[#labels + 1] = p end
+    -- Override subzones: a subzone label is dropped when a POI label of the same
+    -- name is drawn on this map (e.g. Eastvale Logging Camp).
+    if Config.db.poiOverrideSubzones then
+        local poiNames = {}
+        for _, l in ipairs(labels) do
+            if l.kind == "poi" then poiNames[l.name] = true end
+        end
+        local kept = {}
+        for _, l in ipairs(labels) do
+            if not (l.kind == "subzone" and poiNames[l.name]) then kept[#kept + 1] = l end
+        end
+        labels = kept
+    end
     if #labels == 0 then
         if frame then frame:Hide() end
         return

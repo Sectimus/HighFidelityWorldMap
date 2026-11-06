@@ -4,7 +4,7 @@
 -- Remembers the world map's zoom (scale) and pan (scroll position) across
 -- closing and reopening it: the one job the separate PersistentWorldMap
 -- addon (Interface/AddOns/PersistentWorldMap) is built around, folded in
--- here as a single opt-out instead of a second install. On by default via
+-- here as a single opt-out instead of a second install. Off by default via
 -- Config.DEFAULTS.rememberMapZoomPan; toggle from Options or
 -- `/hfwm remember on|off`.
 --
