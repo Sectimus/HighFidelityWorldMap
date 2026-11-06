@@ -208,8 +208,8 @@ Config.DEFAULTS = {
     -- subzone fades in, the other way round. Off, the label shows at every
     -- zoom. See AreaLabels.lua's ZoomFade.
     capitalAreaLabelZoomFade = true,
-    capitalAreaLabelFadeVisibleAt = 1,
-    capitalAreaLabelFadeInvisibleAt = 4,
+    capitalAreaLabelFadeVisibleAt = 0,
+    capitalAreaLabelFadeInvisibleAt = 3,
     capitalAreaLabelFadeInSpeed = 1,
     capitalAreaLabelFadeOutSpeed = 1,
     townAreaLabelZoomFade = true,
@@ -218,7 +218,7 @@ Config.DEFAULTS = {
     townAreaLabelFadeInSpeed = 1,
     townAreaLabelFadeOutSpeed = 1,
     subzoneAreaLabelZoomFade = true,
-    subzoneAreaLabelFadeVisibleAt = 4,
+    subzoneAreaLabelFadeVisibleAt = 3,
     subzoneAreaLabelFadeInvisibleAt = 1,
     subzoneAreaLabelFadeInSpeed = 1,
     subzoneAreaLabelFadeOutSpeed = 1,
@@ -261,7 +261,7 @@ Config.DEFAULTS = {
     continentAreaLabelOpacity = 1,
     capitalAreaLabelOpacity = 1,
     townAreaLabelOpacity = 1,
-    subzoneAreaLabelOpacity = 1,
+    subzoneAreaLabelOpacity = 0.8,
     districtAreaLabelOpacity = 1,
     poiAreaLabelOpacity = 1,
     -- Include Custom (CustomLabels.lua): per type, also show the hand-kept
