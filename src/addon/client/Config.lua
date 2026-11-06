@@ -203,8 +203,8 @@ Config.DEFAULTS = {
     -- fully shown, FadeInvisibleAt where it is fully hidden. Speed sets how
     -- the curve bends between them; 1 is linear. Capital and town fade out
     -- as you zoom in, so their visible step is below the invisible one;
-    -- subzone fades in, the other way round. Off, the label shows at every
-    -- zoom. See AreaLabels.lua's ZoomFade.
+    -- subzone fades in, the other way round. Off, the label switches on at
+    -- its Fully visible step instead. See AreaLabels.lua's ZoomFade.
     capitalAreaLabelZoomFade = true,
     capitalAreaLabelFadeVisibleAt = 0,
     capitalAreaLabelFadeInvisibleAt = 3,

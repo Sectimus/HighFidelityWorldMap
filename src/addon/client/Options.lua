@@ -153,18 +153,19 @@ local function DiffersFromDefaults(keys)
 end
 
 --- The fade settings of one fading label kind (*k*), as a subsection of its Area
---- Labels section. Hidden while its Fade when zoomed is off.
+--- Labels section. Fully visible at always applies; Fully invisible at and the
+--- intensities show only while Fade when zoomed is on.
 local function AreaLabelFadeSection(order, k)
     local showKey, colorKey = k.show, k.color
-    local function FadeOff()
-        return not Config.db[showKey] or not Config.db[colorKey .. "ZoomFade"]
+    local function ZoomOff()
+        return not Config.db[colorKey .. "ZoomFade"]
     end
     return {
         order = order,
         type = "group",
         inline = true,
         name = "Fade",
-        hidden = function() return not Config.db[showKey] or not Config.db[colorKey .. "ZoomFade"] end,
+        hidden = function() return not Config.db[showKey] end,
         args = {
             fadeVisibleAt = {
                 order = 1,
@@ -174,7 +175,6 @@ local function AreaLabelFadeSection(order, k)
                     .. "0 is fully zoomed out (default view)\n"
                     .. "3 is the default fully zoomed in\n"
                     .. "4 is the max zoom level you can zoom in to, or 11 when the \"Additional zoom levels\" setting is enabled.",
-                disabled = FadeOff,
                 min = 0, max = function() return Config:FadeStepMax() end, step = 1,
                 get = function() return Config:FadeStep(colorKey .. "FadeVisibleAt") end,
                 set = function(_, value)
@@ -193,7 +193,7 @@ local function AreaLabelFadeSection(order, k)
                     .. "0 is fully zoomed out (default view)\n"
                     .. "3 is the default fully zoomed in\n"
                     .. "4 is the max zoom level you can zoom in to, or 11 when the \"Additional zoom levels\" setting is enabled.",
-                disabled = FadeOff,
+                hidden = ZoomOff,
                 min = 0, max = function() return Config:FadeStepMax() end, step = 1,
                 get = function() return Config:FadeStep(colorKey .. "FadeInvisibleAt") end,
                 set = function(_, value)
@@ -209,6 +209,7 @@ local function AreaLabelFadeSection(order, k)
                 type = "group",
                 inline = true,
                 name = "",
+                hidden = ZoomOff,
                 args = {
                     fadeInSpeed = {
                         order = 1,
@@ -216,7 +217,6 @@ local function AreaLabelFadeSection(order, k)
                         name = "Fade-in intensity",
                         desc = "How harsh the fade-in animation is, lower value will make "
                             .. "the text visible for longer before switching states",
-                        disabled = FadeOff,
                         min = 0, max = 2, step = 0.05,
                         get = function() return Config.db[colorKey .. "FadeInSpeed"] end,
                         set = function(_, value)
@@ -230,7 +230,6 @@ local function AreaLabelFadeSection(order, k)
                         name = "Fade-out intensity",
                         desc = "How harsh the fade-out animation is, lower value will make "
                             .. "the text visible for longer before switching states",
-                        disabled = FadeOff,
                         min = 0, max = 2, step = 0.05,
                         get = function() return Config.db[colorKey .. "FadeOutSpeed"] end,
                         set = function(_, value)

@@ -297,18 +297,19 @@ local function LadderStep()
     return #levels - 1
 end
 
---- Opacity of a label of *kind* from zoom. 1 when the kind has no Fade when
---- zoomed, or it is off. Fully visible at the kind's Fully visible step and
---- fully hidden at its Fully invisible step, whichever order they come in
---- (the order sets the direction). Fade speed bends the curve between them:
---- 1 is linear; higher starts the change sooner and eases in at the far end;
---- lower holds the label until just before that end.
+--- Opacity of a label of *kind* from zoom. With Fade when zoomed on: fully
+--- visible at the kind's Fully visible step and fully hidden at its Fully
+--- invisible step, whichever order they come in (the order sets the direction).
+--- Fade speed bends the curve between them: 1 is linear; higher starts the
+--- change sooner and eases in at the far end; lower holds the label until just
+--- before that end. With it off, the label switches on at its Fully visible
+--- step and never fades.
 local function ZoomFade(kind)
     local key = KIND[kind].color
-    if not Config.db[key .. "ZoomFade"] then return 1 end
     local step = LadderStep()
     step = step or 0 -- ladder not built yet: the zone view's default is level 0
     local vis = Config:FadeStep(key .. "FadeVisibleAt")
+    if not Config.db[key .. "ZoomFade"] then return step >= vis and 1 or 0 end
     local inv = Config:FadeStep(key .. "FadeInvisibleAt")
     if vis == inv then return step >= vis and 1 or 0 end
     if inv > vis and step < vis then
