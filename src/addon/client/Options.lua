@@ -820,16 +820,17 @@ local options = {
         additionalZoomLevels = {
             order = 50,
             type = "toggle",
-            name = "Additional zoom levels",
+            name = "Additional zoom levels |cffff8800(Experimental)|r",
             desc = "Lets the world map zoom eight steps closer than the "
-                .. "client's own maximum.\n\n|cffff8800Does not currently work "
-                .. "with the Gamepad UI: its map code uses a different "
-                .. "Blizzard API, and adding zoom levels there causes "
+                .. "client's own maximum.\n\n|cffff8800EXPERIMENTAL: known to "
+                .. "cause taint, with no current known workaround.\n\nDoes not "
+                .. "currently work with the Gamepad UI: its map code uses a "
+                .. "different Blizzard API, and adding zoom levels there causes "
                 .. "taint.|r",
             get = function() return Config.db.additionalZoomLevels end,
             set = function(_, value)
-                Config.db.additionalZoomLevels = value
-                ns.ZoomLevels:Refresh()
+                Options:SetExperimental("additionalZoomLevels", value,
+                    "Additional zoom levels", function() ns.ZoomLevels:Refresh() end)
             end,
         },
         keepCentered = {
