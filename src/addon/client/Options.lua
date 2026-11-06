@@ -798,6 +798,12 @@ local options = {
             name = "Satellite world map stitched from the game's own "
                 .. "minimap terrain tiles.\n",
         },
+        legend = {
+            order = 2,
+            type = "description",
+            fontSize = "small",
+            name = "|cff999999Note: a setting declared with |r|cffff8800!|r|cff999999 is marked as still being in-development, and as such is \"experimental\".|r\n",
+        },
         enabled = {
             order = 10,
             type = "toggle",
