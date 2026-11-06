@@ -1,7 +1,7 @@
 -------------------------------------------------------------------------------
 -- HFWM-Forever Zoom Levels
 --
--- Optional "Additional Zoom Levels" feature (on by default): appends extra,
+-- Optional "Additional Zoom Levels" feature (EXPERIMENTAL, off by default): appends extra,
 -- closer zoom steps onto the world map's own zoom ladder, so the higher-
 -- resolution art this addon ships (see hfwm/gamedata/db2.py's _hires_geometry: every
 -- Type=Zone map uncapped, plus Kalimdor/Eastern Kingdoms/Azeroth capped) can
