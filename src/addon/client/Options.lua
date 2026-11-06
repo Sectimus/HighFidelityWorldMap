@@ -1122,7 +1122,7 @@ local options = {
                 caveOtherIndoors = {
                     order = 37,
                     type = "toggle",
-                    name = "Other indoors (beta)",
+                    name = "|cffff8800!|r Other indoors",
                     desc = "Also opens the cave map inside buildings, "
                         .. "houses and every other indoor area, not just "
                         .. "caves, mines and dungeons.",
@@ -1168,7 +1168,7 @@ local options = {
             order = 85,
             type = "group",
             inline = true,
-            name = "Instance map (beta)",
+            name = "|cffff8800!|r Instance map",
             args = {
                 instanceDungeonEnabled = {
                     order = 10,
@@ -1373,7 +1373,7 @@ local SUB_PAGES = {
       keys = { "caveEnabled", "caveAutoOpen", "caveRememberState",
                "caveKeepOpen", "cavePlacement", "caveOtherIndoors",
                "caveAlpha", "caveWindowScale", "caveWindowPoint" } },
-    { key = "instance", title = "Instance Map (beta)",
+    { key = "instance", title = "|cffff8800!|r Instance Map",
       keys = { "instanceDungeonEnabled", "instanceRaidEnabled" } },
     { key = "profiles", title = "Profiles" },
 }

@@ -55,7 +55,7 @@ Config.DEFAULTS = {
     caveOtherIndoors  = false,
 
     -- Instance map: the same window inside dungeon ("party") and raid
-    -- instances, independent of caveEnabled. Off by default (beta).
+    -- instances, independent of caveEnabled. Off by default.
     instanceDungeonEnabled = false,
     instanceRaidEnabled    = false,
 

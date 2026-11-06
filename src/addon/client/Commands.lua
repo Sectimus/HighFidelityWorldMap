@@ -27,7 +27,7 @@ function Commands:Handle(msg)
         if sub == "show" or sub == "open" then
             if not ns.Cave:IsEnabledHere() then
                 P("The map window is off here. Turn it on under Cave map "
-                    .. "or Instance map (beta) in Options.")
+                    .. "or Instance map in Options.")
             elseif not ns.Cave:ForceShow() then
                 P("Nothing to show: you are not in a cave, or the world map "
                     .. "is already showing the one you are in.")
