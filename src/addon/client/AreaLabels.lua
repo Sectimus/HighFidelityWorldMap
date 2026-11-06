@@ -302,14 +302,13 @@ end
 --- invisible step, whichever order they come in (the order sets the direction).
 --- Fade speed bends the curve between them: 1 is linear; higher starts the
 --- change sooner and eases in at the far end; lower holds the label until just
---- before that end. With it off, the label switches on at its Fully visible
---- step and never fades.
+--- before that end. With it off, the label shows at every zoom.
 local function ZoomFade(kind)
     local key = KIND[kind].color
     local step = LadderStep()
     step = step or 0 -- ladder not built yet: the zone view's default is level 0
     local vis = Config:FadeStep(key .. "FadeVisibleAt")
-    if not Config.db[key .. "ZoomFade"] then return step >= vis and 1 or 0 end
+    if not Config.db[key .. "ZoomFade"] then return 1 end
     local inv = Config:FadeStep(key .. "FadeInvisibleAt")
     if vis == inv then return step >= vis and 1 or 0 end
     if inv > vis and step < vis then

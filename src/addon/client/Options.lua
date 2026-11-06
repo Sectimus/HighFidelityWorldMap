@@ -173,7 +173,6 @@ local function AreaLabelFadeSection(order, k)
                 name = "Fully visible at",
                 desc = "What zoom level should this label type be fully visible at?\n"
                     .. "0 is fully zoomed out (default view)\n"
-                    .. "3 is the default fully zoomed in\n"
                     .. "4 is the max zoom level you can zoom in to, or 11 when the \"Additional zoom levels\" setting is enabled.",
                 min = 0, max = function() return Config:FadeStepMax() end, step = 1,
                 get = function() return Config:FadeStep(colorKey .. "FadeVisibleAt") end,
@@ -191,7 +190,6 @@ local function AreaLabelFadeSection(order, k)
                 name = "Fully invisible at",
                 desc = "What zoom level should this label type be fully invisible at?\n"
                     .. "0 is fully zoomed out (default view)\n"
-                    .. "3 is the default fully zoomed in\n"
                     .. "4 is the max zoom level you can zoom in to, or 11 when the \"Additional zoom levels\" setting is enabled.",
                 hidden = ZoomOff,
                 min = 0, max = function() return Config:FadeStepMax() end, step = 1,

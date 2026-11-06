@@ -148,7 +148,7 @@ Config.DEFAULTS = {
     -- Per-type label scales, each on top of areaLabelScale. Stored as the actual
     -- multiplier; the Options sliders show each as a percent of its default.
     continentAreaLabelScale = 1,
-    capitalAreaLabelScale = 1.15,
+    capitalAreaLabelScale = 1.35,
     townAreaLabelScale = 1.3,
     subzoneAreaLabelScale = 0.18,
     districtAreaLabelScale = 1.3,
@@ -203,11 +203,11 @@ Config.DEFAULTS = {
     -- fully shown, FadeInvisibleAt where it is fully hidden. Speed sets how
     -- the curve bends between them; 1 is linear. Capital and town fade out
     -- as you zoom in, so their visible step is below the invisible one;
-    -- subzone fades in, the other way round. Off, the label switches on at
-    -- its Fully visible step instead. See AreaLabels.lua's ZoomFade.
+    -- subzone fades in, the other way round. Off, the label shows at every
+    -- zoom. See AreaLabels.lua's ZoomFade.
     capitalAreaLabelZoomFade = true,
-    capitalAreaLabelFadeVisibleAt = 0,
-    capitalAreaLabelFadeInvisibleAt = 3,
+    capitalAreaLabelFadeVisibleAt = 1,
+    capitalAreaLabelFadeInvisibleAt = 4,
     capitalAreaLabelFadeInSpeed = 1,
     capitalAreaLabelFadeOutSpeed = 1,
     townAreaLabelZoomFade = true,
@@ -216,8 +216,8 @@ Config.DEFAULTS = {
     townAreaLabelFadeInSpeed = 1,
     townAreaLabelFadeOutSpeed = 1,
     subzoneAreaLabelZoomFade = true,
-    subzoneAreaLabelFadeVisibleAt = 11,
-    subzoneAreaLabelFadeInvisibleAt = 3,
+    subzoneAreaLabelFadeVisibleAt = 4,
+    subzoneAreaLabelFadeInvisibleAt = 1,
     subzoneAreaLabelFadeInSpeed = 1,
     subzoneAreaLabelFadeOutSpeed = 1,
     -- Districts fade out like capitals and towns, on by default.
@@ -234,10 +234,10 @@ Config.DEFAULTS = {
     -- <color>Font is a path of its own, or "global" to follow the Global Font.
     areaLabelFont = "Fonts\\FRIZQT__.TTF",
     continentAreaLabelFont = "global",
-    capitalAreaLabelFont = "global",
+    capitalAreaLabelFont = "Fonts\\SKURRI.TTF",
     townAreaLabelFont = "global",
     subzoneAreaLabelFont = "global",
-    districtAreaLabelFont = "global",
+    districtAreaLabelFont = "Fonts\\SKURRI.TTF",
     -- Uppercase (Options): draws the label's text in capital letters. Off by
     -- default.
     continentAreaLabelUppercase = false,
@@ -249,7 +249,7 @@ Config.DEFAULTS = {
     -- Letter spacing (Options): space between letters, as a fraction of the text
     -- size. 0 is the font's own spacing.
     continentAreaLabelSpacing = 0,
-    capitalAreaLabelSpacing = 0,
+    capitalAreaLabelSpacing = 0.1,
     townAreaLabelSpacing = 0,
     subzoneAreaLabelSpacing = 0,
     districtAreaLabelSpacing = -0.07,
@@ -280,8 +280,8 @@ Config.DEFAULTS = {
     poiAreaLabelColor2 = { 1, 200 / 255, 90 / 255 },
     poiAreaLabelGradientDir = "VERTICAL",
     poiAreaLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
-    poiAreaLabelZoomFade = true,
-    poiAreaLabelFadeVisibleAt = 0,
+    poiAreaLabelZoomFade = false,
+    poiAreaLabelFadeVisibleAt = 1,
     poiAreaLabelFadeInvisibleAt = 3,
     poiAreaLabelFadeInSpeed = 1,
     poiAreaLabelFadeOutSpeed = 1,
