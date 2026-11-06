@@ -389,6 +389,19 @@ function AreaLabels:Refresh()
         end
     end
     for _, p in ipairs(custom) do labels[#labels + 1] = p end
+    -- Override subzones: a subzone label is dropped when a POI label of the same
+    -- name is drawn on this map (e.g. Eastvale Logging Camp).
+    if Config.db.poiOverrideSubzones then
+        local poiNames = {}
+        for _, l in ipairs(labels) do
+            if l.kind == "poi" then poiNames[l.name] = true end
+        end
+        local kept = {}
+        for _, l in ipairs(labels) do
+            if not (l.kind == "subzone" and poiNames[l.name]) then kept[#kept + 1] = l end
+        end
+        labels = kept
+    end
     if #labels == 0 then
         if frame then frame:Hide() end
         return

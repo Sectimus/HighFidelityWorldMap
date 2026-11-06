@@ -160,6 +160,8 @@ Config.DEFAULTS = {
     subzoneAreaLabelCollapsed = true,
     districtAreaLabelCollapsed = true,
     poiAreaLabelCollapsed = true,
+    -- POI section: hide a subzone label when a POI label of the same name is drawn.
+    poiOverrideSubzones = true,
     -- Auto-scale per label type: labels grow as you zoom out and shrink as you
     -- zoom in, from their label scale at the loosest zoom step. See
     -- AreaLabels.lua's AreaLabelScale.

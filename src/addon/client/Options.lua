@@ -174,7 +174,7 @@ local function AreaLabelFadeSection(order, k)
                 desc = "What zoom level should this label type be fully visible at?\n"
                     .. "0 is fully zoomed out (default view)\n"
                     .. "4 is the max zoom level you can zoom in to, or 11 when the \"Additional zoom levels\" setting is enabled.",
-                min = 0, max = function() return Config:FadeStepMax() end, step = 1,
+                min = 0, max = 11, step = 1,
                 get = function() return Config:FadeStep(colorKey .. "FadeVisibleAt") end,
                 set = function(_, value)
                     -- Ends must differ: equal values would make the fade undefined.
@@ -192,7 +192,7 @@ local function AreaLabelFadeSection(order, k)
                     .. "0 is fully zoomed out (default view)\n"
                     .. "4 is the max zoom level you can zoom in to, or 11 when the \"Additional zoom levels\" setting is enabled.",
                 hidden = ZoomOff,
-                min = 0, max = function() return Config:FadeStepMax() end, step = 1,
+                min = 0, max = 11, step = 1,
                 get = function() return Config:FadeStep(colorKey .. "FadeInvisibleAt") end,
                 set = function(_, value)
                     -- Ends must differ: equal values would make the fade undefined.
@@ -317,6 +317,20 @@ local function AreaLabelGroup(order, title, k, desc)
                     ns.AreaLabels:Refresh()
                 end,
             },
+            overrideSubzones = k.noIncludeCustom and {
+                order = 19,
+                type = "toggle",
+                name = "Override subzones",
+                desc = "Hides a subzone label when a point of interest with the same "
+                    .. "name is also shown, so the name is only drawn once. For ex. "
+                    .. "Eastvale Logging Camp is both.",
+                hidden = function() return not Config.db[showKey] end,
+                get = function() return Config.db.poiOverrideSubzones end,
+                set = function(_, value)
+                    Config.db.poiOverrideSubzones = value
+                    ns.AreaLabels:Refresh()
+                end,
+            } or nil,
             spacing = {
                 order = 18,
                 type = "range",
