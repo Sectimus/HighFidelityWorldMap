@@ -308,8 +308,8 @@ local function ZoomFade(kind)
     if not Config.db[key .. "ZoomFade"] then return 1 end
     local step = LadderStep()
     step = step or 0 -- ladder not built yet: the zone view's default is level 0
-    local vis = Config.db[key .. "FadeVisibleAt"]
-    local inv = Config.db[key .. "FadeInvisibleAt"]
+    local vis = Config:FadeStep(key .. "FadeVisibleAt")
+    local inv = Config:FadeStep(key .. "FadeInvisibleAt")
     if vis == inv then return step >= vis and 1 or 0 end
     if inv > vis and step < vis then
         -- Below the visible step, a fade-out label fades in from nothing at step 0

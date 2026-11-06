@@ -288,6 +288,18 @@ Config.DEFAULTS = {
     poiAreaLabelFont = "global",
 }
 
+--- Highest zoom ladder step a fade end may use: 11 with Additional zoom
+--- levels, otherwise 4. Stored fade ends are clamped to it on read, so a
+--- value set while Additional zoom levels was on comes back when re-enabled.
+function Config:FadeStepMax()
+    return (self.db and self.db.additionalZoomLevels) and 11 or 4
+end
+
+--- A fade end (*key*, a Config.db field) clamped to FadeStepMax.
+function Config:FadeStep(key)
+    return math.min(self.db[key], self:FadeStepMax())
+end
+
 --- Fonts the Area Labels can use, in dropdown order. Blizzard ships these
 --- with every client (the game swaps in a locale font where it must).
 Config.AREA_LABEL_FONTS = {
