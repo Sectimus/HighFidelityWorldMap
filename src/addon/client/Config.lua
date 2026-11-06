@@ -150,7 +150,7 @@ Config.DEFAULTS = {
     continentAreaLabelScale = 1,
     capitalAreaLabelScale = 1.35,
     townAreaLabelScale = 1.3,
-    subzoneAreaLabelScale = 0.18,
+    subzoneAreaLabelScale = 0.36,
     districtAreaLabelScale = 1.3,
     -- Options' Area Labels sections: collapsed (only Enabled and the button
     -- show) or expanded, remembered per profile.
