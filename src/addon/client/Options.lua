@@ -190,13 +190,14 @@ local function AreaLabelFadeSection(order, k)
                 name = "Fully invisible at",
                 desc = "What zoom level should this label type be fully invisible at?\n"
                     .. "0 is fully zoomed out (default view)\n"
-                    .. "4 is the max zoom level you can zoom in to, or 11 when the \"Additional zoom levels\" setting is enabled.",
+                    .. "3 is the lowest value, and 4 is the max zoom level you can zoom in to, or 11 when the \"Additional zoom levels\" setting is enabled.",
                 hidden = ZoomOff,
                 min = 0, max = 11, step = 1,
-                get = function() return Config:FadeStep(colorKey .. "FadeInvisibleAt") end,
+                get = function() return math.max(Config:FadeStep(colorKey .. "FadeInvisibleAt"), Config.db.additionalZoomLevels and 0 or 3) end,
                 set = function(_, value)
                     -- Ends must differ: equal values would make the fade undefined.
                     -- A clash keeps the stored value; the handle still follows the drag.
+                    value = math.max(value, Config.db.additionalZoomLevels and 0 or 3)
                     if value == Config:FadeStep(colorKey .. "FadeVisibleAt") then return end
                     Config.db[colorKey .. "FadeInvisibleAt"] = value
                     ns.AreaLabels:Refresh()
