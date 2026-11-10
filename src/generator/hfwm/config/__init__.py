@@ -14,7 +14,7 @@ ocean       Sea colours and thresholds.
 interior    Interior (cave / dungeon) pass constants.
 
 This is a fork of the retail HFWM pipeline pinned to the "World of Warcraft
-Forever" beta client.  Differences from the retail configuration:
+Forever" client.  Differences from the retail configuration:
 
 * Every DB2 request is pinned to :data:`~hfwm.config.build.GAME_BUILD`.
   ``WorldMapArea`` does not exist on this build (it 404s) and is not used

@@ -1,6 +1,6 @@
 ## Interface: 16001
 ## Title: High Fidelity World Map
-## Notes: Overlays high-resolution minimap exploration textures onto the world map for a satellite-view experience. Built from World of Warcraft Forever (wow_classic_beta 1.60.1.69913) map data. Type /hfwm to toggle.
+## Notes: Overlays high-resolution minimap exploration textures onto the world map for a satellite-view experience. Built from World of Warcraft Forever (1.60.1.70888) map data. Type /hfwm to toggle.
 ## Author: HighFidelityWorldMap
 ## Category: Map
 ## SavedVariables: HighFidelityWorldMapDB

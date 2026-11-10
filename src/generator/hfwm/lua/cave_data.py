@@ -9,7 +9,7 @@ would have returned.  ``Cave.lua`` reads it through the same accessors it
 uses for C_Map, which is what lets one renderer serve both sources:
 
     HFWMF_CAVE_DATA = {
-        build   = "1.60.1.69913",
+        build   = "1.60.1.70888",
         places  = {
             {
                 name    = "Fargodeep Mine",   -- the window's titlebar

@@ -523,7 +523,7 @@ THENOXIOUSLAIR = MineSpec(
 # build happens to be freshest). That listfile is a union across this
 # WMO's entire patch history; the higher-numbered sub-tile FDIDs were
 # added in some later retail patch that baked a higher-resolution mosaic
-# for these rooms, and simply don't exist yet in this classic-beta
+# for these rooms, and simply don't exist yet in the 1.60.1.69913
 # build's own CASC archive. So every one of these groups is single-tile
 # here, the same as groups 8/9 (warmcave) and 9/14 (crypt_d) already
 # were assumed to be -- no stitching needed after all, and nothing left
