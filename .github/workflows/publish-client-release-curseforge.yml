@@ -91,6 +91,7 @@ jobs:
           ref: refs/tags/${{ inputs.tag }}
           # release.sh walks back through tags to build the changelog.
           fetch-depth: 0
+          lfs: true
 
       # Same generation as release-addon-client.yml, so the package is rebuilt
       # exactly as the Release was: the low-res maps and zone masks, no HD art.

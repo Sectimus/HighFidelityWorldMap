@@ -8,9 +8,9 @@
 #
 # src/addon/art/ (the high-resolution map art) is its own addon, built from
 # .pkgmeta-art; it is not part of this package. The low-resolution art
-# (src/addon/client/WorldMap/) and the Fog of War zone masks
-# (src/addon/client/ZoneMasks/) are gitignored, built by CI's
-# generate-world-map-assets action and shipped here as built.
+# (src/addon/client/WorldMap/) is gitignored, built by CI's generate-world-map-assets
+# action and shipped here as built. The Fog of War zone masks (src/addon/client/ZoneMasks/)
+# are built from the hand traces in continent-fog-masks/, which is not shipped.
 
 package-as: HighFidelityWorldMap
 
@@ -39,6 +39,7 @@ ignore:
   - SECURITY.md
   - HighFidelityWorldMap.code-workspace
   - assets
+  - continent-fog-masks
   - docs
   - src/addon/client/dev
   - src/addon/art

@@ -9,9 +9,9 @@
 -- the whole zone is not explored. All or nothing, deliberately.
 --
 -- Where each zone lies on Kalimdor, Eastern Kingdoms and the World map, and
--- the mask that crops the map to its border, are baked into ZoneShapes.lua
--- and ZoneMasks\ (scripts/emit_zone_shapes.py) from the game's own
--- per-chunk area data, so the outline is the zone's real border.
+-- the mask that crops the map to its border, are built from the hand traces in
+-- continent-fog-masks/ by scripts/build_zone_masks.py: ZoneShapes.lua and
+-- ZoneMasks\.
 -------------------------------------------------------------------------------
 local addonName, ns = ...
 local ZoneFog = ns.ZoneFog

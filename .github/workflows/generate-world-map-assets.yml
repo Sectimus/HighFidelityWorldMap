@@ -1,13 +1,13 @@
 name: Generate World Map Assets
 
-# Runs the generate-world-map-assets action, which builds every generated tree
-# the addons ship — the HD art (src/addon/art/WorldMap/), the low-resolution
-# maps (src/addon/client/WorldMap/) and the Fog of War zone masks
-# (src/addon/client/ZoneMasks/) — and saves them to the Actions cache *from
+# Runs the generate-world-map-assets action, which builds the generated trees the
+# addons ship — the HD art (src/addon/art/WorldMap/) and the low-resolution maps
+# (src/addon/client/WorldMap/) — and saves them to the Actions cache *from
 # main*. That is the only scope a tag-triggered release can read, so every
 # release reuses them instead of repeating the ~40 minute generation. See
-# .github/actions/generate-world-map-assets for the three cache entries and
-# their keys.
+# .github/actions/generate-world-map-assets for the two cache entries and their
+# keys. The Fog of War zone masks are not cached: the action rebuilds them from
+# the hand-traced PSDs on every run.
 #
 #   - weekly: GitHub evicts caches unused for 7 days; a lookup here (a real
 #     restore on the weekly run) resets that clock. A miss regenerates.
@@ -57,7 +57,6 @@ jobs:
         id: key
         env:
           HASH: ${{ hashFiles('src/generator/generateHFWM.py', 'src/generator/hfwm/**/*.py', 'src/generator/requirements.txt') }}
-          ZONES_HASH: ${{ hashFiles('src/generator/generateHFWM.py', 'src/generator/hfwm/**/*.py', 'src/generator/requirements.txt', 'src/generator/scripts/emit_zone_shapes.py', 'src/generator/scripts/emit_zone_overlays.py') }}
         run: .github/scripts/world-map-assets-keys.sh >> "$GITHUB_OUTPUT"
 
       # Only the weekly run downloads the assets, to reset the eviction clock
@@ -81,25 +80,14 @@ jobs:
           lookup-only: ${{ github.event_name != 'schedule' }}
           path: src/addon/client/WorldMap
           key: ${{ steps.key.outputs.lowres-key }}
-      - name: Restore zone mask cache
-        id: masks
-        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.bypass-asset-cache }}
-        uses: actions/cache/restore@v5
-        with:
-          lookup-only: ${{ github.event_name != 'schedule' }}
-          path: |
-            src/addon/client/ZoneMasks
-            src/addon/client/data/ZoneShapes.lua
-          key: ${{ steps.key.outputs.masks-key }}
 
-      # One decision from all three restore results, so a build only runs when
-      # at least one of the three trees is missing.
+      # One decision from both restore results, so a build only runs when at
+      # least one of the two trees is missing.
       - name: Decide whether anything is missing
         id: decide
         env:
           ART_HIT: ${{ steps.art.outputs.cache-hit }}
           LOWRES_HIT: ${{ steps.lowres.outputs.cache-hit }}
-          MASKS_HIT: ${{ steps.masks.outputs.cache-hit }}
         run: .github/scripts/decide-world-map-assets.sh >> "$GITHUB_OUTPUT"
 
   build:
@@ -111,6 +99,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          # The trace PSDs are LFS files; the zone masks are built from them.
+          lfs: true
 
       - name: Generate world map assets
         uses: ./.github/actions/generate-world-map-assets

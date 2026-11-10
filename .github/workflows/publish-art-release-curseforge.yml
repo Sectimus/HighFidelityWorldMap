@@ -99,6 +99,7 @@ jobs:
           ref: refs/tags/${{ inputs.tag }}
           # release.sh walks back through tags to build the changelog.
           fetch-depth: 0
+          lfs: true
 
       # The assets job above guarantees main's cache holds the table and art (a
       # hit when the generator has not changed, see

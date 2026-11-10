@@ -5,8 +5,9 @@ This project is split into three parts:
 - `src/addon/client/` — the addon (`HighFidelityWorldMap`) that hooks into the
   in-game world map. Zone and cave views are drawn from the game's own map
   textures; the World and continent views ship with it at low resolution
-  (`WorldMap/`) plus the Fog of War zone masks (`ZoneMasks/`), both built by
-  CI, not committed.
+  (`WorldMap/`) at low resolution, built by CI, plus the Fog of War zone masks
+  (`ZoneMasks/`) built from the hand traces in `continent-fog-masks/`. None of
+  them is committed.
 - `src/addon/art/` — the optional Art addon (`HighFidelityWorldMap_Art_Forever`):
   just the high-resolution (`*HD`) World, Eastern Kingdoms and Kalimdor map
   tiles and a TOC, kept separate so a client update is not a 1 GB download.
@@ -98,7 +99,7 @@ python src/generator/scripts/emit_cave_tiles.py
 
 `IndoorData.lua` and `IndoorTiles.lua` (every other indoor area: houses, inns, towers, unnamed caves; about 1.2 MB together) come from `python src/generator/scripts/emit_indoors.py`. It finds every placed WMO with baked minimap art in the Eastern Kingdoms and Kalimdor object files (`hfwm/caves/indoors.py`, using the community listfile, downloaded once into the cache, about 150 MB) and bakes each like a mine; a couple of minutes once the files are cached. The addon only uses them while **Other indoors** is on. The same script also writes `SubMaps.lua`: the Ironforge and Undercity canvases (`SUBMAPS` in the script), placed on those cities' own world maps instead of being cave-window places.
 
-Two more tables are not part of the full run; both feed the World/Continent Fog of War checkbox. `ZoneOverlays.lua` (how many exploration overlays each zone has) comes from `python src/generator/scripts/emit_zone_overlays.py`, which downloads three small DB2 tables. `ZoneShapes.lua` and `src/addon/client/ZoneMasks/` (one smoothed outline mask per zone, 6 MB, not committed — CI builds both at release time) come from `python src/generator/scripts/emit_zone_shapes.py`. It reads the area ID of every terrain chunk from the game's ADT files (about 1,700 downloads, a couple of minutes, cached as 512 bytes each), so the borders are the game's own and follow the stitched art. The masks sit outside `WorldMap/` so regenerating that folder never touches them.
+Two more tables are not part of the full run; both feed the World/Continent Fog of War checkbox. `ZoneOverlays.lua` (how many exploration overlays each zone has) comes from `python src/generator/scripts/emit_zone_overlays.py`, which downloads three small DB2 tables. The zone masks come from the hand traces: `python src/generator/scripts/build_zone_masks.py` reads `continent-fog-masks/eastern-kingdoms-traces.psd` and `kalimdor-traces.psd` (Git LFS, so run `git lfs pull` first) and writes `src/addon/client/ZoneMasks/` (one mask per zone, not committed) and `src/addon/client/data/ZoneShapes.lua` (committed). The table must match the build exactly; CI fails the release otherwise.
 
 Useful flags include:
 
@@ -157,11 +158,11 @@ When ready to publish:
 - run **Create Release: Art** (or push an `art-v*` tag to `main`) to generate the art, package `.pkgmeta-art`, create the GitHub release (one asset, `hfwm-forever-art-v1.2.3.zip`) and then start **Publish Art Release to CurseForge**.
 - run either **Publish ... Release to CurseForge** workflow yourself with a release's tag to retry or redo that upload.
 
-The `generate-world-map-assets` workflow builds and caches every generated tree on `main` — the HD art (`mapart-v3-<hash>`), the low-resolution maps (`maplow-v1-<hash>`) and the zone masks (`zonemasks-v1-<hash>`) — so a release only regenerates what the generator changed. Each release workflow's package step ignores the other series' tags.
+The `generate-world-map-assets` workflow builds and caches the HD art (`mapart-v3-<hash>`) and the low-resolution maps (`maplow-v1-<hash>`) on `main`, so a release only regenerates what the generator changed. The zone masks are rebuilt from the traces on every release and are not cached. Each release workflow's package step ignores the other series' tags.
 
 ## Notes
 
 - Generated cave tile data is a build artifact and is not normally committed.
 - `src/addon/client/data/` holds the committed generator-produced tables (`FDIDMap.lua`, `CaveData.lua`, `ZoneShapes.lua` and the rest); none of them is a hand-edited file.
-- None of the generated map art is committed. `src/addon/client/WorldMap/`, `src/addon/client/ZoneMasks/` and `src/addon/art/WorldMap/` are all gitignored and built by CI (the `generate-world-map-assets` action), cached per tree. Regenerate locally with `python src/generator/generateHFWM.py` and `python src/generator/scripts/emit_zone_shapes.py`.
+- None of the generated map art is committed. `src/addon/client/WorldMap/` and `src/addon/art/WorldMap/` are gitignored and built by CI (the `generate-world-map-assets` action), cached per tree. `src/addon/client/ZoneMasks/` is gitignored and built from the traces. Regenerate locally with `python src/generator/generateHFWM.py` and `python src/generator/scripts/build_zone_masks.py`.
 - `src/addon/client/Libs/` is fetched during local dev and CI; none of its contents are committed.

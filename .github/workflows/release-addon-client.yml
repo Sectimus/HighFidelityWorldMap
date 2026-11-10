@@ -104,6 +104,7 @@ jobs:
           # Empty on a pushed-tag release, which means the triggering ref.
           ref: ${{ needs.tag.outputs.tag }}
           fetch-depth: 0
+          lfs: true
 
       # Builds the generated trees the client ships: the low-resolution maps
       # and the Fog of War zone masks. The HD art is skipped (art: "false"), so

@@ -112,7 +112,7 @@ Each zone is traced once, on the continent it sits on. Its World map (947) posit
 
 ## Agent steps
 
-Read first: `src/addon/client/ZoneFog.lua`, `Renderer.lua` (around the `worldFogZones` drawing, about line 1314), `src/generator/scripts/emit_zone_shapes.py` (`map_box`, `zone_mask`, `pow2`, `MAPS`), and the sections of `docs/BUILDING.md` that mention the zone masks (lines 8, 101, 149, 166).
+Read first: `src/addon/client/ZoneFog.lua`, `Renderer.lua` (around the `worldFogZones` drawing, about line 1314), `src/generator/scripts/build_zone_masks.py` (`CONTINENTS`, `zone_mask`, `write_shapes`), and the sections of `docs/BUILDING.md` that mention the zone masks.
 
 1. **Validate the PSDs.** Canvas must be exactly 8192 × 5461. Layer names must be `z<id>` for the zones listed for that file, with no duplicates, no extra zones and no empty layers. Stop and report anything else.
 2. **Rasterize each zone.** Take the layer's alpha at canvas size, applying the layer offset.
@@ -131,7 +131,7 @@ Read first: `src/addon/client/ZoneFog.lua`, `Renderer.lua` (around the `worldFog
 9. **Wire the build (required, not optional).**
    - Release builds run the generator in CI (`.github/actions/generate-world-map-assets/action.yml`, `.github/scripts/world-map-assets-keys.sh`). The trace PSDs must be part of the cache keys and the build inputs there. Read those two files before changing anything. I have not read them yet.
    - Update `docs/BUILDING.md`.
-10. **Clean cutover, after the user approves the in-game result.** Remove the chunk path from `emit_zone_shapes.py`: the terrain download, `AREA_CACHE`, `absorb_cities`, and the blur constants. Update the header comment in `ZoneFog.lua`, which still describes the per-chunk data. Leave no shim.
+10. **Clean cutover (done).** The chunk path is removed from the generator; `emit_zone_shapes.py` is deleted, and the trace builder is `src/generator/scripts/build_zone_masks.py`.
 
 ## Open decisions
 
