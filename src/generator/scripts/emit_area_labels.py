@@ -42,7 +42,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from emit_zone_shapes import CHUNK, terrain_areas, tiles_needed  # noqa: E402
+from terrain_chunks import CHUNK, terrain_areas, tiles_needed  # noqa: E402
 from hfwm.caves.indoors import _present_all, _read_listfile  # noqa: E402
 from hfwm.caves.indoors import WORLD_MAPS  # noqa: E402
 from hfwm.caves.wmo import iter_modf_placements, parse_wmo_groups  # noqa: E402

@@ -1,24 +1,27 @@
 name: Generate world map assets
 description: >-
   Produce the generated map assets the two addons ship: the high-resolution
-  art in src/addon/art/WorldMap/ for the Art addon, the low-resolution art in
-  src/addon/client/WorldMap/ and the Fog of War zone masks in
-  src/addon/client/ZoneMasks/ for the client — reusing the cached copies when
-  the generator has not changed since they were last built.
+  art in src/addon/art/WorldMap/ for the Art addon, and the low-resolution art
+  in src/addon/client/WorldMap/ for the client, reusing the cached copies when
+  the generator has not changed since they were last built. The Fog of War zone
+  masks in src/addon/client/ZoneMasks/ are always built from the hand-traced
+  PSDs in continent-fog-masks/.
 
-# Three trees, each cached separately, keyed by what it depends on:
+# Two trees, each cached separately, keyed by what it depends on:
 #
 #   art (mapart-v3-<hash>)      the HD World and continent maps, ~1 GB. A pure
 #                               function of the generator, so that is the key.
 #   lowres (maplow-v1-<hash>)   the low-resolution maps, ~23 MB. Same key as the
 #                               art: one generator run writes both.
-#   masks (zonemasks-v1-<hash>) the zone masks + ZoneShapes.lua, ~6 MB. Depends
-#                               on the generator and scripts/emit_zone_shapes.py
-#                               (outside hfwm/), so its own hash.
 #
-# A release that only touches Lua, docs or workflows hits all three caches and
-# skips the ~40 minute build. Nothing the addons ship is committed anymore, so
-# every workflow that packages an addon runs this first, whatever it releases.
+# The zone masks are not cached. build_zone_masks.py runs in seconds, and a cache
+# keyed on its inputs could only ever serve a stale result. Its other output,
+# src/addon/client/data/ZoneShapes.lua, is committed, and this action fails when
+# the build no longer matches the committed file.
+#
+# A release that only touches Lua, docs or workflows hits both caches and skips
+# the ~40 minute build. Nothing the addons ship is committed anymore, so every
+# workflow that packages an addon runs this first, whatever it releases.
 #
 # GitHub scopes caches by ref: a run on a tag can read caches saved from the
 # default branch but not from any other tag. So the copies that *later* releases
@@ -50,7 +53,7 @@ inputs:
 
 outputs:
   cache-hit:
-    description: "'true' when everything came from the cache instead of being generated."
+    description: "'true' when the HD and low-res art came from the cache instead of being generated."
     value: ${{ steps.decide.outputs.cache-hit }}
   art-key:
     description: "The art cache key, mapart-v3-<hash>. The hash identifies the generator build."
@@ -58,9 +61,6 @@ outputs:
   lowres-key:
     description: "The low-res art cache key, maplow-v1-<hash>."
     value: ${{ steps.key.outputs.lowres-key }}
-  masks-key:
-    description: "The zone mask cache key, zonemasks-v1-<hash>."
-    value: ${{ steps.key.outputs.masks-key }}
 
 runs:
   using: composite
@@ -70,7 +70,6 @@ runs:
       shell: bash
       env:
         HASH: ${{ hashFiles('src/generator/generateHFWM.py', 'src/generator/hfwm/**/*.py', 'src/generator/requirements.txt') }}
-        ZONES_HASH: ${{ hashFiles('src/generator/generateHFWM.py', 'src/generator/hfwm/**/*.py', 'src/generator/requirements.txt', 'src/generator/scripts/emit_zone_shapes.py', 'src/generator/scripts/emit_zone_overlays.py') }}
       run: .github/scripts/world-map-assets-keys.sh >> "$GITHUB_OUTPUT"
 
     - name: Delete world map assets caches
@@ -78,7 +77,7 @@ runs:
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
-        KEYS: ${{ steps.key.outputs.art-key }} ${{ steps.key.outputs.lowres-key }} ${{ steps.key.outputs.masks-key }}
+        KEYS: ${{ steps.key.outputs.art-key }} ${{ steps.key.outputs.lowres-key }}
       run: .github/scripts/delete-world-map-assets-cache.sh
 
     - name: Restore world map art cache
@@ -97,16 +96,6 @@ runs:
         path: src/addon/client/WorldMap
         key: ${{ steps.key.outputs.lowres-key }}
 
-    - name: Restore zone mask cache
-      id: masks
-      if: inputs.bypass-cache != 'true'
-      uses: actions/cache/restore@v5
-      with:
-        path: |
-          src/addon/client/ZoneMasks
-          src/addon/client/data/ZoneShapes.lua
-        key: ${{ steps.key.outputs.masks-key }}
-
     - name: Decide what to generate
       id: decide
       shell: bash
@@ -115,30 +104,25 @@ runs:
         BYPASS: ${{ inputs.bypass-cache }}
         ART_HIT: ${{ steps.art.outputs.cache-hit }}
         LOWRES_HIT: ${{ steps.lowres.outputs.cache-hit }}
-        MASKS_HIT: ${{ steps.masks.outputs.cache-hit }}
       run: .github/scripts/decide-world-map-assets.sh >> "$GITHUB_OUTPUT"
 
     - name: Set up Python
-      if: steps.decide.outputs.python == 'true'
       uses: actions/setup-python@v6
       with:
         python-version: "3.12"
 
     - name: Install dependencies
-      if: steps.decide.outputs.python == 'true'
       shell: bash
       run: .github/scripts/install-python-deps.sh
 
     - name: Resolve game build
       id: pipeline
-      if: steps.decide.outputs.python == 'true'
       shell: bash
       run: python .github/scripts/resolve_game_build.py >> "$GITHUB_OUTPUT"
 
     # ~460 MB of DB2 exports, WDTs and minimap BLPs pulled from wago.tools.
-    # Only needed when something has to be built.
+    # The zone masks read DB2 tables too, so this runs on every build.
     - name: Restore pipeline cache
-      if: steps.decide.outputs.python == 'true'
       uses: actions/cache@v5
       with:
         path: ${{ steps.pipeline.outputs.cache_dir }}
@@ -158,12 +142,23 @@ runs:
       shell: bash
       run: python src/generator/generateHFWM.py --lowres-only --no-caves --skip-fdid-map
 
-    # emit_zone_shapes.py writes both the masks and the Lua table that places
-    # them, so the pair is restored or built (and cached) as one.
+    # The hand-traced PSDs are the only source of the zone masks and of the
+    # table that places them. Always built, never restored from a cache.
     - name: Generate zone masks
-      if: steps.decide.outputs.masks == 'true'
       shell: bash
-      run: python src/generator/scripts/emit_zone_shapes.py
+      run: python src/generator/scripts/build_zone_masks.py
+
+    # The committed ZoneShapes.lua must be exactly what the traces produce. A
+    # difference means a trace or the script changed without the rebuilt table
+    # being committed: fail, rather than ship the two out of step.
+    - name: Check ZoneShapes.lua matches the traces
+      shell: bash
+      run: |
+        if ! git diff --quiet -- src/addon/client/data/ZoneShapes.lua; then
+          echo "::error::src/addon/client/data/ZoneShapes.lua does not match continent-fog-masks/*-traces.psd. Run python src/generator/scripts/build_zone_masks.py and commit the result."
+          git diff -- src/addon/client/data/ZoneShapes.lua
+          exit 1
+        fi
 
     # Runs on cache hits too: a bad entry should fail here, not ship.
     - name: Verify world map assets
@@ -186,11 +181,3 @@ runs:
       with:
         path: src/addon/client/WorldMap
         key: ${{ steps.key.outputs.lowres-key }}
-    - name: Save zone mask cache
-      if: inputs.save == 'true' && steps.decide.outputs.masks == 'true' && steps.masks.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v5
-      with:
-        path: |
-          src/addon/client/ZoneMasks
-          src/addon/client/data/ZoneShapes.lua
-        key: ${{ steps.key.outputs.masks-key }}

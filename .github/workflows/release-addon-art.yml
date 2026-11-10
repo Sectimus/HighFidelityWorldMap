@@ -102,6 +102,7 @@ jobs:
           # Empty on a pushed-tag release, which means the triggering ref.
           ref: ${{ needs.tag.outputs.tag }}
           fetch-depth: 0
+          lfs: true
 
       # Only the World, Eastern Kingdoms and Kalimdor maps are generated. A
       # manual run is on main, so it saves to the cache scope that later runs
