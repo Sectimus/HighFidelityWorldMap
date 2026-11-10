@@ -1,7 +1,7 @@
 """hfwm — High Fidelity World Map pipeline toolkit.
 
 A fork of the retail HFWM pipeline pinned to the "World of Warcraft
-Forever" beta client.  The community listfile, AI inpainting, continent
+Forever" client.  The community listfile, AI inpainting, continent
 overlays and zone presets are all gone; tile identity comes straight
 from the build-pinned ``UiMapArtTile`` export instead.
 

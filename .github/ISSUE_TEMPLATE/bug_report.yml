@@ -43,7 +43,7 @@ body:
     attributes:
       label: Game build
       description: Run `/run print(GetBuildInfo())` in game and paste the result.
-      placeholder: "e.g. 1.60.1.69913, 12345, ..."
+      placeholder: "e.g. 1.60.1.70888, 12345, ..."
     validations:
       required: true
 

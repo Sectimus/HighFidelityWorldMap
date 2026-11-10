@@ -105,7 +105,7 @@ The addon itself is not a traditional "build" in the sense of compiling a binary
 - Git
 - Python 3.12+
 - Lua 5.1 (for syntax checks)
-- A working World of Warcraft Forever beta environment for in-game testing
+- A working World of Warcraft Forever environment for in-game testing
 
 ## 1) Clone and initialize
 
@@ -129,7 +129,7 @@ addon with its TOC directly inside it. Link `src/addon/client/` into your
 AddOns directory under that name:
 
 ```sh
-ADDONS="<WoW install>/_classic_beta_/Interface/AddOns"
+ADDONS="<WoW install>/<Forever flavor folder>/Interface/AddOns"
 ln -s "$PWD/src/addon/client" "$ADDONS/HighFidelityWorldMap"
 ```
 
