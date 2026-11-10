@@ -485,6 +485,25 @@ function Commands:Handle(msg)
         self:OpenSettingsDialog()
         return
     elseif cmd == "debug" then
+        if args[2] == "fog" then
+            local sub, arg = args[3], args[4]
+            local zone = tonumber((arg or ""):match("^z?(%d+)$"))
+            if sub == "show" and not arg then
+                ns.ZoneFog:SetForcedAll(true)
+                ns.Renderer:ForceRefresh()
+                P("Every zone now treated as fully explored (this session; /reload resets).")
+                return
+            end
+            if (sub ~= "show" and sub ~= "hide") or not zone then
+                P("Usage: /hfwm debug fog show [z<UiMapID>] | hide z<UiMapID>")
+                return
+            end
+            ns.ZoneFog:SetForced(zone, sub == "show")
+            ns.Renderer:ForceRefresh()
+            P(("Zone %d now treated as %s explored (this session; /reload resets)."):format(
+                zone, sub == "show" and "fully" or "not"))
+            return
+        end
         self:Debug()
         return
     elseif cmd == "" then
@@ -516,6 +535,7 @@ function Commands:Handle(msg)
         print("                        (all = survey everything, big = shown"
             .. " + large only, nuke/restore)")
         print("  /hfwm debug         - diagnostic info + force refresh")
+        print("  /hfwm debug fog show [z<id>] | hide z<id> - treat zone(s) fully / not explored (session)")
         print("  /hfwm testmask [off] - show live reveal texture file(s) "
             .. "raw, unmasked (diagnostic; off removes them)")
         print("  /hfwm icon          - texture/atlas info for the quest-list "

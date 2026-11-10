@@ -1,0 +1,2 @@
+assets/images/zone-reference-*.png filter=lfs diff=lfs merge=lfs -text
+continent-fog-masks/*.psd filter=lfs diff=lfs merge=lfs -text
