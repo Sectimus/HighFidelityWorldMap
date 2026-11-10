@@ -19,8 +19,16 @@ local ZoneFog = ns.ZoneFog
 local OVERLAYS = HFWMF_ZONE_OVERLAYS or {}
 local SHAPES   = HFWMF_ZONE_SHAPES or {}
 
+--- Debug override from /hfwm debug fog show|hide: true/false, nil = real state.
+local forced = {}
+
+--- Debug override from /hfwm debug fog show (no zone): every zone explored, this session.
+local forcedAll = false
+
 --- Has the player explored every overlay of this zone?
 local function fullyExplored(zoneID)
+    if forced[zoneID] ~= nil then return forced[zoneID] end
+    if forcedAll then return true end
     local want = OVERLAYS[zoneID]
     if not want then return false end
     local seen, n = {}, 0
@@ -57,4 +65,14 @@ function ZoneFog:Explored(mapID)
         if fullyExplored(shape[1]) then zones[#zones + 1] = shape end
     end
     return zones
+end
+
+--- Debug: treat *zoneID* as fully explored (true) or not (false), this session.
+function ZoneFog:SetForced(zoneID, explored)
+    forced[zoneID] = explored
+end
+
+--- Debug: treat every zone as fully explored (true) or real state (false), this session.
+function ZoneFog:SetForcedAll(explored)
+    forcedAll = explored
 end

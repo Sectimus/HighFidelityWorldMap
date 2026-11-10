@@ -1,6 +1,12 @@
 # Build-stamped pipeline cache (DB2 CSVs, WDTs, minimap BLPs)
 .cache-*/
 
+# Blizzard continent art stitched for hand-tracing the Fog of War masks; not ours to commit
+continent-fog-masks/*.png
+
+# Trace working copies with embedded reference art; hundreds of MB, not for commit
+continent-fog-masks/*-BAK.psd
+
 # Auto-generated project README; rebuilt from docs/ and intentionally not kept in
 # local git state so branch updates do not cause divergence for contributors.
 README.md
