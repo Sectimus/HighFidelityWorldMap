@@ -294,4 +294,10 @@ HFWMF_CUSTOM_LABELS = {
         { name = "Forlorn Gardens", text = "Forlorn\nGardens", kind = "poi", u = 0.742, v = 0.755 },
         { name = "Bristleback Retreat", text = "Bristleback\nRetreat", kind = "poi", u = 0.642, v = 0.228 },
     },
+    [1414] = {
+        { name = "Kalimdor", kind = "continent", u = 0.519, v = 0.522 },
+    },
+    [1415] = {
+        { name = "Eastern Kingdoms", kind = "continent", u = 0.512, v = 0.556 },
+    },
 }

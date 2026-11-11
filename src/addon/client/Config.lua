@@ -200,6 +200,12 @@ Config.DEFAULTS = {
     townAreaLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
     subzoneAreaLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
     districtAreaLabelOutline = { 52 / 255, 20 / 255, 5 / 255 },
+    -- Continent names: no zoom fade by default, same as POIs.
+    continentAreaLabelZoomFade = false,
+    continentAreaLabelFadeVisibleAt = 0,
+    continentAreaLabelFadeInvisibleAt = 3,
+    continentAreaLabelFadeInSpeed = 1,
+    continentAreaLabelFadeOutSpeed = 1,
     -- Fade when zoomed, per type. Two zoom ladder steps (0 furthest out, 11
     -- the most zoomed in) bound the fade: FadeVisibleAt is where the label is
     -- fully shown, FadeInvisibleAt where it is fully hidden. Speed sets how
