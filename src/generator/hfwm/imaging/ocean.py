@@ -83,6 +83,7 @@ from __future__ import annotations
 from collections import deque
 
 from ..config.ocean import (
+    OCEAN_DARK_MAX,
     OCEAN_FILL_COLORS,
     OCEAN_FILL_TOLERANCE,
     OCEAN_TILE_FRACTION,
@@ -116,22 +117,19 @@ def parse_rgb(value: str) -> tuple[int, int, int]:
 # Pixel pass
 # ---------------------------------------------------------------------------
 
-def ocean_mask(rgb):
+def ocean_mask(rgb, terrainless: bool = False):
     """Return a bool mask of ocean-fill pixels in an ``HxWx3`` array.
 
     Matches any colour in :data:`OCEAN_FILL_COLORS` within
     :data:`OCEAN_FILL_TOLERANCE` per channel (Chebyshev distance).
 
-    Pure black is deliberately *not* matched.  It looks like a "no data"
-    fill and it is tempting to sweep it in here, but inside a tile that
-    has loaded it is mostly sparse inland speckle — across Eastern
-    Kingdoms' 736 source tiles it is 6595 pixels, 0.003%, and four
-    fifths of that is in tiles with no sea in them at all.  Matching it
-    bought nothing and cost correctness: it put blue dots into interior
-    maps like Alterac Valley that have no ocean anywhere near them.  The
-    black that actually matters is whole cells the WDT never had a tile
-    for, and :func:`classify_missing_cells` handles those with the
-    context to know whether they are sea.
+    Pure black is matched only in a terrain-less tile (*terrainless*, see
+    :mod:`hfwm.gamedata.terrain`). There the sea is a flat dark fill whatever
+    colour the build paints it, so every pixel at or below
+    :data:`OCEAN_DARK_MAX` counts. Elsewhere pure black is not sea: it is
+    sparse inland speckle, and matching it put blue dots into interior maps
+    like Alterac Valley. Whole cells the WDT never had a tile for are handled
+    by :func:`classify_missing_cells`.
     """
     import numpy as np
 
@@ -140,6 +138,8 @@ def ocean_mask(rgb):
     for color in OCEAN_FILL_COLORS:
         delta = np.abs(rgb - np.array(color, dtype=np.int16)).max(axis=2)
         mask |= delta <= OCEAN_FILL_TOLERANCE
+    if terrainless:
+        mask |= (rgb <= OCEAN_DARK_MAX).all(axis=2)
     return mask
 
 

@@ -30,6 +30,12 @@ OCEAN_FILL_COLORS = (
 # leaves behind; going much wider starts eating dark coastal cliff shadow.
 OCEAN_FILL_TOLERANCE = 10
 
+# Terrain-less tiles are open sea whatever colour the build paints them. In
+# build 1.60.1.70888 that is near-black (5, 6, 5), (5, 5, 5) and (0, 0, 0), so
+# inside those tiles any pixel at or below this per-channel level is sea.
+# Tiles with terrain never use this; see hfwm.gamedata.terrain.
+OCEAN_DARK_MAX = 20
+
 # The colour everything above is collapsed onto.  This is the coastal
 # water fill, chosen because it is what actually abuts the coastline —
 # unify onto the near-black open-ocean fill instead and every shore gets

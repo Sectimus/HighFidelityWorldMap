@@ -7,6 +7,7 @@ import struct
 # MAID field indices.
 MAID_FIELD_MINIMAP = 7      # minimapTexture — what we want
 MAID_FIELD_MAPTEXTURE = 5   # mapTexture (terrain LOD diffuse), NOT "no liquid"
+MAID_FIELD_ROOT_ADT = 0      # root ADT FileDataID: the terrain tile itself
 
 
 def parse_wdt_maid(
