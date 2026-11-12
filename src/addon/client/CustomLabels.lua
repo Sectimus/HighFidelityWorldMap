@@ -5,7 +5,7 @@
 -- data classes differently (or not at all). Read by AreaLabels.lua. Not
 -- generated; edit freely.
 --
--- [uiMapID] = { { name, kind, u, v [, text, h] }, ... }
+-- [uiMapID] = { { name, kind, u, v [, text, h, scale, spacing] }, ... }
 --   name  the text shown when no text is given. Matched against AreaLabelData.lua
 --         by name and kind: a shown custom label hides the same-named area label
 --         of the same kind on that map. Different kinds are shown alongside.
@@ -19,7 +19,7 @@
 --   u, v  the centre in 0-1 map coordinates from the map's top-left.
 --   h     optional label height in canvas units at scale 1; defaults per kind
 --         (AreaLabels.lua's DEFAULT_H).
---   scale optional size multiplier for this label alone (default 1).
+--   scale optional size multiplier for this label alone, above 0 (default 1).
 --   spacing optional letter spacing, added to the kind's Letter spacing (default 0).
 --   hide  optional true: draws nothing, but hides the same-named same-kind area
 --         label on that map (removes a generated label).

@@ -28,7 +28,7 @@ local WorldMapFrame = _G.WorldMapFrame
 local AREA_LABELS = HFWMF_AREA_LABELS or {}
 
 --- Hand-kept labels from CustomLabels.lua, same shape as AREA_LABELS entries
---- (h optional). Each shows under its kind's Include Custom toggle; kind
+--- (h, scale, spacing optional). Each shows under its kind's Include Custom toggle; kind
 --- "poi" shows with the Points of Interest type itself.
 local CUSTOM_LABELS = HFWMF_CUSTOM_LABELS or {}
 
@@ -101,7 +101,7 @@ end
 
 --- Lay *text* out in *run*, each FontString TOPLEFT-anchored to *anchor* at
 --- (ax, ay): lines on rows, segments spaced by *gap* canvas units, each line
--- centred on the widest. *color* colours the run; *grad* ({a, b}) colours each
+--- centred on the widest. *color* colours the run; *grad* ({a, b}) colours each
 --- letter across the text instead. Returns the run's width and height.
 local function SetRun(run, anchor, ax, ay, text, font, size, gap, color, grad)
     local perChar = gap ~= 0 or grad ~= nil
@@ -307,8 +307,8 @@ local function ZoomFade(kind)
     local key = KIND[kind].color
     local step = LadderStep()
     step = step or 0 -- ladder not built yet: the zone view's default is level 0
-    local vis = Config:FadeStep(key .. "FadeVisibleAt")
     if not Config.db[key .. "ZoomFade"] then return 1 end
+    local vis = Config:FadeStep(key .. "FadeVisibleAt")
     local inv = Config:FadeStep(key .. "FadeInvisibleAt")
     if vis == inv then return step >= vis and 1 or 0 end
     if inv > vis and step < vis then
