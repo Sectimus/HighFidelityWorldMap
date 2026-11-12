@@ -885,6 +885,7 @@ local function DoRefresh(force)
     Config.lastCanvasH   = canvasH
     Config.lastLayerIdx  = layerIdx
     Config.lastSubmerged = submerged
+    Config.lastLayout    = nil
 
     if not Config.db or not Config.db.enabled then
         if trace then P("  BAIL: disabled") end
@@ -1153,6 +1154,20 @@ local function DoRefresh(force)
         Watchdog:Start()
         return bg
     end
+
+    -- What this refresh laid out, for /hfwm debug picker (DebugPicker.lua):
+    -- the grid, tile sources and flags the textures above were built from.
+    Config.lastLayout = {
+        mapID = mapID, background = background, mapType = mapType,
+        layerIdx = layerIdx, canvasW = canvasW, canvasH = canvasH,
+        blizzardLayerW = blizzardLayerW, blizzardLayerH = blizzardLayerH,
+        layerW = layerW, layerH = layerH, tilePxW = tilePxW, tilePxH = tilePxH,
+        cols = cols, rows = rows, gridX = gridX, gridY = gridY,
+        tileSource = tileSource, fdids = fdids,
+        useBundled = useBundled, useSubmerged = useSubmerged,
+        fogOfWar = fogOfWar, fogActive = fogActive, fullyExplored = fullyExplored,
+        worldFogZones = worldFogZones, nativeZone = nativeZone, clientZone = clientZone,
+    }
 
     if canvasW == 0 or canvasH == 0 then
         Activate()

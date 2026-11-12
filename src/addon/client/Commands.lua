@@ -485,6 +485,10 @@ function Commands:Handle(msg)
         self:OpenSettingsDialog()
         return
     elseif cmd == "debug" then
+        if args[2] == "picker" then
+            ns.DebugPicker:Command(args[3])
+            return
+        end
         if args[2] == "fog" then
             local sub, arg = args[3], args[4]
             local zone = tonumber((arg or ""):match("^z?(%d+)$"))
@@ -536,6 +540,7 @@ function Commands:Handle(msg)
             .. " + large only, nuke/restore)")
         print("  /hfwm debug         - diagnostic info + force refresh")
         print("  /hfwm debug fog show [z<id>] | hide z<id> - treat zone(s) fully / not explored (session)")
+        print("  /hfwm debug picker [on|off] - middle-click the world map to open a copyable report of what is drawn under that point (session)")
         print("  /hfwm testmask [off] - show live reveal texture file(s) "
             .. "raw, unmasked (diagnostic; off removes them)")
         print("  /hfwm icon          - texture/atlas info for the quest-list "
