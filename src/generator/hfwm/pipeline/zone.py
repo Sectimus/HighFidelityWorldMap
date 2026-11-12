@@ -70,7 +70,11 @@ from ..imaging.ocean import (
     ocean_mask,
     reachable_sea_pixels,
 )
-from ..imaging.resample import resize_rgba
+from ..imaging.resample import bleed_colour
+
+# How far (px) an erased sea's colour is carried into its alpha-0 neighbours.
+# Covers a bilinear or LANCZOS footprint across the coast.
+BLEED_RADIUS = 8
 
 
 # ---------------------------------------------------------------------------
@@ -320,9 +324,7 @@ def _stitch_region(
             # the region's effective stitch resolution.)
             if w < tp or h < tp:
                 upscaled += 1
-            # resize_rgba, not Image.resize: an erased sea keeps its colour
-            # under alpha 0 and Pillow's premultiplied path would zero it.
-            tile = resize_rgba(tile, (tp, tp), Image.LANCZOS)
+            tile = tile.resize((tp, tp), Image.LANCZOS)
 
         stitch.paste(tile, (x0, y0))
         tile.close()
@@ -596,7 +598,7 @@ def process_zone(
                 f"(coverage {cx0:.3f},{cy0:.3f}-{cx1:.3f},{cy1:.3f})"
             )
 
-        scaled = resize_rgba(cropped, (px1 - px0, py1 - py0), Image.LANCZOS)
+        scaled = cropped.resize((px1 - px0, py1 - py0), Image.LANCZOS)
         cropped.close()
         layer.paste(scaled, (px0, py0))
         scaled.close()
@@ -634,7 +636,7 @@ def process_zone(
             zone_info, base_art_cache or {}, orig_w, orig_h,
         )
         if canvas is not None and (orig_w, orig_h) != (out_w, out_h):
-            upscaled = resize_rgba(canvas, (out_w, out_h), Image.LANCZOS)
+            upscaled = canvas.resize((out_w, out_h), Image.LANCZOS)
             canvas.close()
             canvas = upscaled
         if canvas is None:
@@ -668,12 +670,8 @@ def process_zone(
             canvas = Image.new("RGBA", (out_w, out_h), background)
 
     if want_alpha_sea:
-        # Plain paste, not alpha_composite.  Compositing would resolve every
-        # transparent pixel against the canvas and throw away the sea colour
-        # that erase_tile() deliberately left in the RGB channels, which is
-        # what keeps the coastline downscaling into sea rather than into
-        # black.  There is nothing to composite against anyway: the canvas
-        # here is empty by construction.
+        # Plain paste: the canvas is empty by construction, so there is
+        # nothing to composite against.
         canvas.paste(layer, (0, 0))
     else:
         canvas.alpha_composite(layer)
@@ -695,7 +693,17 @@ def process_zone(
     for i, fname in enumerate(names):
         x0 = (i % cols) * tile_w
         y0 = (i // cols) * tile_h
-        piece = layer.crop((x0, y0, x0 + tile_w, y0 + tile_h))
+        if want_alpha_sea:
+            # Bleed reads across the tile edge, so bleed a padded crop and
+            # cut this tile back out of it.
+            pad = BLEED_RADIUS
+            px0, py0 = max(x0 - pad, 0), max(y0 - pad, 0)
+            px1, py1 = min(x0 + tile_w + pad, layer.width), min(y0 + tile_h + pad, layer.height)
+            padded = bleed_colour(layer.crop((px0, py0, px1, py1)), pad)
+            piece = padded.crop((x0 - px0, y0 - py0, x0 - px0 + tile_w, y0 - py0 + tile_h))
+            padded.close()
+        else:
+            piece = layer.crop((x0, y0, x0 + tile_w, y0 + tile_h))
         data = encode_blp2_bgra(piece)
         piece.close()
         with open(os.path.join(zone_dst, fname), "wb") as fp:
