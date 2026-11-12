@@ -68,6 +68,9 @@ function MaskPool:Acquire()
     if not mask then
         mask = Config.overlayFrame:CreateMaskTexture()
     end
+    -- A recycled mask keeps the crop DrawExploredPiece gave it; whoever
+    -- acquires it next (the continent zone masks) expects the whole file.
+    mask:SetTexCoord(0, 1, 0, 1)
     activeMasks[#activeMasks + 1] = mask
     return mask
 end
