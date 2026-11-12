@@ -34,6 +34,7 @@ ns.Integrations = {}
 ns.Coords      = {}
 ns.ZoneFog = {}
 ns.AreaLabels  = {}
+ns.DebugPicker = {}
 
 -- Convenience printer (accessible everywhere via ns.P)
 ns.P = function(msg) print("|cff33ccffHFWM-F:|r " .. msg) end

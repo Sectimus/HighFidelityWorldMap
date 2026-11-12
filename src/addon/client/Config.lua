@@ -958,6 +958,7 @@ Config.lastCanvasH     = 0
 Config.lastMapID       = nil
 Config.lastLayerIdx    = nil
 Config.lastSubmerged   = nil
+Config.lastLayout      = nil   -- tile layout of the last refresh (Renderer; /hfwm debug picker)
 Config.tracing         = false
 
 -- Cave map runtime state (the window itself is built by CaveRenderer)
