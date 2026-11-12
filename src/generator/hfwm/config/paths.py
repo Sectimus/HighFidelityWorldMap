@@ -48,6 +48,8 @@ BASE_ART_TILE_CACHE = CACHE_ROOT / "baseart"
 # the per-group minimap tiles.
 WMO_CACHE_DIR = CACHE_ROOT / "wmo"
 WMO_TILE_CACHE_DIR = CACHE_ROOT / "wmo_minimap"
+# Root ADTs, one "1"/"0" file per FDID: does that terrain tile have any terrain?
+ADT_TERRAIN_CACHE = CACHE_ROOT / "adt_terrain"
 # The wowdev community listfile (FileDataID -> path); the only place the
 # WMO -> minimap tile mapping exists. ~150 MB, downloaded once.
 LISTFILE_CACHE = CACHE_ROOT / "survey" / "community-listfile.csv"

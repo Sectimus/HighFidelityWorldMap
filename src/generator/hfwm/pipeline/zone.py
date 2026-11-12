@@ -61,6 +61,7 @@ from ..config.tiles import (
     TILE_WORLD_SIZE,
 )
 from ..formats.blp import encode_blp2_bgra
+from ..gamedata.terrain import terrainless_cells
 from ..geometry.coordinates import compute_crop_box
 from ..geometry.tile_grid import tile_filenames
 from ..imaging.ocean import (
@@ -112,7 +113,7 @@ _PARALLEL_DECODE_MIN_TILES = 150
 _PARALLEL_DECODE_WORKERS = min(4, os.cpu_count() or 1)
 
 
-def _decode_and_measure(path: Path, want_color_pass: bool):
+def _decode_and_measure(path: Path, want_color_pass: bool, terrainless: bool):
     """Decode one source tile and, if requested, its ocean mask.
 
     Pulled out of ``_stitch_region``'s pass 1 so the exact same decode
@@ -142,7 +143,7 @@ def _decode_and_measure(path: Path, want_color_pass: bool):
     if w < MIN_SOURCE_TILE_PX or h < MIN_SOURCE_TILE_PX:
         return "too_small", None, None
     arr = np.array(tile)
-    mask = ocean_mask(arr[:, :, :3]) if want_color_pass else None
+    mask = ocean_mask(arr[:, :, :3], terrainless) if want_color_pass else None
     return "ok", arr, mask
 
 
@@ -232,6 +233,11 @@ def _stitch_region(
             missing += 1
             continue
         keyed_paths.append((r, c, path))
+    terrainless = (
+        terrainless_cells(region["map_id"], {(r, c) for r, c, _ in keyed_paths})
+        if want_color_pass
+        else set()
+    )
 
     def _apply_decoded(r: int, c: int, status: str, arr, mask) -> None:
         nonlocal too_small, unreadable
@@ -257,6 +263,7 @@ def _stitch_region(
                     _decode_and_measure,
                     [p for _, _, p in keyed_paths],
                     [want_color_pass] * len(keyed_paths),
+                    [(r, c) in terrainless for r, c, _ in keyed_paths],
                     chunksize=8,
                 )
                 for (r, c, _path), (status, arr, mask) in zip(keyed_paths, results):
@@ -273,11 +280,13 @@ def _stitch_region(
             too_small = 0
             unreadable = 0
             for r, c, path in keyed_paths:
-                status, arr, mask = _decode_and_measure(path, want_color_pass)
+                status, arr, mask = _decode_and_measure(
+                    path, want_color_pass, (r, c) in terrainless)
                 _apply_decoded(r, c, status, arr, mask)
     else:
         for r, c, path in keyed_paths:
-            status, arr, mask = _decode_and_measure(path, want_color_pass)
+            status, arr, mask = _decode_and_measure(
+                path, want_color_pass, (r, c) in terrainless)
             _apply_decoded(r, c, status, arr, mask)
 
     # A cell confidently read as open water — the seed a pixel-level
