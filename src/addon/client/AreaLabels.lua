@@ -101,7 +101,7 @@ end
 
 --- Lay *text* out in *run*, each FontString TOPLEFT-anchored to *anchor* at
 --- (ax, ay): lines on rows, segments spaced by *gap* canvas units, each line
---- centred on the widest. *color* colours the run; *grad* ({a, b}) colours each
+-- centred on the widest. *color* colours the run; *grad* ({a, b}) colours each
 --- letter across the text instead. Returns the run's width and height.
 local function SetRun(run, anchor, ax, ay, text, font, size, gap, color, grad)
     local perChar = gap ~= 0 or grad ~= nil
@@ -188,7 +188,7 @@ local function Paint(l, label, x, y, scale, opaque)
     local banded = vertical and opaque
     local o = Config.db[key .. "Outline"]
     local grad = gradient and not vertical and { a, b } or nil
-    local gap = Config.db[key .. "Spacing"] * size
+    local gap = (Config.db[key .. "Spacing"] + (label.spacing or 0)) * size
     local font = FontFor(key)
     local shown = label.text or label.name
     if Config.db[key .. "Uppercase"] then shown = shown:upper() end
@@ -368,7 +368,7 @@ function AreaLabels:Refresh()
         return false
     end
     local custom, shadowed = {}, {}
-    for _, p in ipairs(all and CUSTOM_LABELS[mapID] or {}) do
+    for _, p in ipairs(canvas and Config.db.enabled and CUSTOM_LABELS[mapID] or {}) do
         local k = KIND[p.kind]
         if p.hide then
             shadowed[p.kind .. "|" .. p.name] = true
@@ -428,8 +428,8 @@ function AreaLabels:Refresh()
             labelFrames[i] = l
         end
         local alpha = ZoomFade(label.kind) * Config.db[KIND[label.kind].color .. "Opacity"]
-        Paint(l, label, label.u * w, -label.v * h, AreaLabelScale(label.kind),
-            alpha * frameAlpha >= 1)
+        Paint(l, label, label.u * w, -label.v * h,
+            AreaLabelScale(label.kind) * (label.scale or 1), alpha * frameAlpha >= 1)
         Fade(l, alpha)
     end
     for i = #labels + 1, #labelFrames do

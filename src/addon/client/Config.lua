@@ -136,7 +136,7 @@ Config.DEFAULTS = {
     -- Area Labels (AreaLabels.lua): names drawn on the map over its art, in six
     -- groups: continent names, capital cities, towns and hubs, points of
     -- interest, subzones, and city districts (only on a capital's own map).
-    showAreaContinentNames = false,
+    showAreaContinentNames = true,
     showAreaCapitalCities = true,
     showAreaTownsHubs = true,
     showAreaSubzoneNames = true,
