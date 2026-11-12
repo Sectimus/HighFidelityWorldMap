@@ -152,15 +152,11 @@ ALPHA_SEA = Pass(
         "an empty cell that opens onto the sea from one walled inside a "
         "landmass, so on the Ocean Blue background the ~1% of cells that "
         "--ocean deliberately leaves black go blue instead.",
-        "The sea colour match itself (hfwm.imaging.ocean.ocean_mask) is a flat "
-        "exact-colour test with no idea where on the map a pixel sits. A "
-        "lake, a river, or dark terrain shading that happens to land in "
-        "the same narrow colour range as open ocean would otherwise be "
-        "erased right along with real ocean. hfwm.imaging.ocean.reachable_sea_tiles "
-        "is the guard: a tile is only trusted as sea if a chain of "
-        "ocean-coloured tiles connects it back to one read with high "
-        "confidence as open water, same reasoning classify_missing_cells "
-        "already uses for gaps in the tile grid.",
+        "Which pixels are sea comes from the terrain, not from colour: "
+        "hfwm.gamedata.ocean_water reads each ADT's Ocean-type liquid and "
+        "seabed depth, so a lake, a river, a canal or dark terrain shading "
+        "is never erased with the sea, and a change in the colour the "
+        "minimap baker paints the sea with cannot leave stripes behind.",
     ),
 )
 

@@ -15,6 +15,7 @@ from ..config.paths import (
 from ..config.tiles import UI_MAP_TYPE_CONTINENT, UI_MAP_TYPE_WORLD
 from ..gamedata.db2 import fetch_zone_db
 from ..gamedata.microdungeon import build_cave_table
+from ..gamedata.ocean_water import fetch_ocean_cells
 from ..imaging.effects import stamp
 from ..lua.cave_data import generate_cave_data
 from ..lua.fdid_map import generate_fdid_map
@@ -155,6 +156,14 @@ def download_source_tiles(
         needed_fdids, MINIMAP_TILE_CACHE, "minimap", dl_threads,
     )
     tile_size_histogram(tile_cache)
+
+    # Which pixels are sea is read from the terrain, not guessed from the
+    # minimap's colour; see hfwm.gamedata.ocean_water. Only the stitched
+    # (World and Continent) maps need it.
+    print("\n--- Phase 2a: Reading terrain for the open sea ---", flush=True)
+    fetch_ocean_cells(
+        reg for z in art_zones(zone_db).values() for reg in z["regions"]
+    )
 
     base_art_cache: dict[int, Path] = {}
     if want_base_art:

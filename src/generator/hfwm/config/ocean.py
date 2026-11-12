@@ -1,39 +1,20 @@
-"""Ocean unification (see hfwm/imaging/ocean.py).
-
-The sea arrives in the stitch as several different flat fills, so where
-they meet you get hard rectangular seams on tile boundaries.  Measured
-over the 1858 cached minimap tiles for this build, these are the fills
-and roughly how much of the sampled pixel population each holds:
-
-  (8, 16, 16)    4.1%   open ocean — an ADT with no terrain in it
-  (26, 50, 69)   0.3%   coastal water rendered through the water shader
-  (2, 55, 70)    0.1%   deeper water over an ADT
-  (8, 20, 21)    0.1%   open ocean, second variant
-  (29, 53, 72)   0.03%  coastal water, second variant
-
-Inland lakes are deliberately absent: they carry their own tint and are
-left alone.
-"""
+"""Ocean handling (see hfwm/gamedata/ocean_water.py and hfwm/imaging/ocean.py)."""
 
 from __future__ import annotations
 
-OCEAN_FILL_COLORS = (
-    (8, 16, 16),
-    (26, 50, 69),
-    (2, 55, 70),
-    (8, 20, 21),
-    (29, 53, 72),
-)
+# A terrain cell counts as open sea when its ocean liquid surface is at least
+# this many yards above the highest seabed corner of the cell. Measured on
+# build 1.60.1.70888's Eastern Kingdoms, over every Ocean-liquid cell: down to
+# ~16 yards the minimap still shows the seabed through the water (mean
+# luminance 22+, textured); from 32 it is the flat near-black fill (mean 11);
+# from 64, 95% of cells are pure fill and by 128 all of them are. 32 erases
+# the fill and leaves the lit coastal shelf alone.
+OCEAN_MIN_DEPTH = 32.0
 
-# Per-channel slack when matching the fills above.  The fills are flat and
-# exact, so this only needs to absorb the ±6 dither the terrain renderer
-# leaves behind; going much wider starts eating dark coastal cliff shadow.
-OCEAN_FILL_TOLERANCE = 10
-
-# The colour everything above is collapsed onto.  This is the coastal
-# water fill, chosen because it is what actually abuts the coastline —
-# unify onto the near-black open-ocean fill instead and every shore gets
-# darker rather than the sea getting consistent.
+# The colour every sea pixel is collapsed onto by the ``ocean`` pass.  This is
+# the coastal water fill, chosen because it is what actually abuts the
+# coastline — unify onto the near-black open-ocean fill instead and every
+# shore gets darker rather than the sea getting consistent.
 DEFAULT_OCEAN_COLOR = (26, 50, 69)
 
 # How much of a source tile must read as ocean before empty cells next to

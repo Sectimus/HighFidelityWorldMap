@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT))
 
 from hfwm.config.paths import CACHE_ROOT  # noqa: E402
 from hfwm.config.tiles import TILE_WORLD_SIZE  # noqa: E402
-from hfwm.formats.wdt import parse_wdt_maid  # noqa: E402
+from hfwm.formats.wdt import MAID_FIELD_ROOT_ADT, parse_wdt_maid  # noqa: E402
 from hfwm.gamedata.db2 import _fetch_wdt  # noqa: E402
 from hfwm.gamedata.tables import fetch_pinned_table  # noqa: E402
 from hfwm.geometry.coordinates import world_to_tile  # noqa: E402
@@ -25,7 +25,6 @@ from hfwm.infra.http import download_casc  # noqa: E402
 
 AREA_CACHE = CACHE_ROOT / "adt_areas"
 
-MAID_FIELD_ROOT_ADT = 0   # WDT MAID field holding the root ADT's FileDataID
 CHUNK = TILE_WORLD_SIZE / 16
 THREADS = 12
 
