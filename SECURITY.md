@@ -66,4 +66,4 @@ Releases are built by GitHub Actions from tags on `main`, and the CurseForge upl
 
 ## Building from source
 
-Running the generator (`src/generator/generateHFWM.py`) downloads game data from third-party hosts over HTTPS and installs Python packages (`Pillow`, `numpy`, `scipy`). Use a virtual environment, and review `src/generator/requirements.txt` first.
+Running the generator (`src/generator/generateHFWM.py`) downloads game data from third-party hosts over HTTPS and installs Python packages (`Pillow`, `numpy`, `psd-tools`). Use a virtual environment, and review `src/generator/requirements.txt` first.

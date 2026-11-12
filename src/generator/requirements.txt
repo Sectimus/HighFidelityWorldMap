@@ -2,13 +2,8 @@
 # generateHFWM.py, and CI installs from here so the workflows cannot drift
 # out of step with what the pipeline actually imports.
 Pillow
-# hfwm/ocean.py does its sea masking on the pixel array: the ocean-fill
-# match in ocean_mask, and the alpha erase in erase_tile.
+# hfwm/ocean.py does its sea masking on the pixel array (the alpha erase in
+# apply_erase), and gamedata/ocean_water.py reads ADT heights with it.
 numpy
-# hfwm/ocean.py's reachable_sea_pixels uses scipy.ndimage.label to split
-# the region-wide ocean-colour mask into 4-connected components, so a
-# false colour match (dark terrain shading, say) that isn't actually
-# joined to real open water can be told apart from it and left alone.
-scipy
 # build_zone_masks.py reads the hand-traced zone layers from the trace PSDs.
 psd-tools

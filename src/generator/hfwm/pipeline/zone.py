@@ -53,7 +53,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from ..config.ocean import OCEAN_TILE_FRACTION
+from ..config.ocean import OCEAN_MIN_DEPTH, OCEAN_TILE_FRACTION
 from ..config.tiles import (
     MINIMAP_TILE_PX,
     MIN_SOURCE_TILE_PX,
@@ -61,14 +61,13 @@ from ..config.tiles import (
     TILE_WORLD_SIZE,
 )
 from ..formats.blp import encode_blp2_bgra
+from ..gamedata.ocean_water import ocean_cells
 from ..geometry.coordinates import compute_crop_box
 from ..geometry.tile_grid import tile_filenames
 from ..imaging.ocean import (
     apply_erase,
     apply_unify,
     classify_missing_cells,
-    ocean_mask,
-    reachable_sea_pixels,
 )
 from ..imaging.resample import resize_rgba
 
@@ -112,8 +111,20 @@ _PARALLEL_DECODE_MIN_TILES = 150
 _PARALLEL_DECODE_WORKERS = min(4, os.cpu_count() or 1)
 
 
-def _decode_and_measure(path: Path, want_color_pass: bool):
-    """Decode one source tile and, if requested, its ocean mask.
+def _ocean_pixels(map_id: int, row: int, col: int, w: int, h: int):
+    """Open-sea mask of one source tile, at the tile's own *w* x *h* pixels."""
+    import numpy as np
+    from PIL import Image
+
+    cells = ocean_cells(map_id, row, col, OCEAN_MIN_DEPTH)
+    if not cells.any():
+        return np.zeros((h, w), dtype=bool)
+    img = Image.fromarray(cells.astype(np.uint8) * 255)
+    return np.array(img.resize((w, h), Image.NEAREST)) > 0
+
+
+def _decode_tile(path: Path):
+    """Decode one source tile.
 
     Pulled out of ``_stitch_region``'s pass 1 so the exact same decode
     logic can run either in-process (small regions, the common case) or
@@ -124,11 +135,11 @@ def _decode_and_measure(path: Path, want_color_pass: bool):
     separate processes speed it up — threads measured no faster than
     running sequentially.
 
-    Returns ``(status, array_or_None, mask_or_None)`` where *status* is
-    one of ``"ok"``, ``"too_small"``, ``"unreadable"``. The tile comes
-    back as a raw RGBA array rather than a ``PIL.Image``: an ``Image``
-    can't cross a process boundary as cheaply as its own backing buffer,
-    and the caller reconstructs one locally when it needs it.
+    Returns ``(status, array_or_None)`` where *status* is one of
+    ``"ok"``, ``"too_small"``, ``"unreadable"``. The tile comes back as
+    a raw RGBA array rather than a ``PIL.Image``: an ``Image`` can't
+    cross a process boundary as cheaply as its own backing buffer, and
+    the caller reconstructs one locally when it needs it.
     """
     from PIL import Image
 
@@ -137,13 +148,11 @@ def _decode_and_measure(path: Path, want_color_pass: bool):
     try:
         tile = Image.open(path).convert("RGBA")
     except Exception:
-        return "unreadable", None, None
+        return "unreadable", None
     w, h = tile.size
     if w < MIN_SOURCE_TILE_PX or h < MIN_SOURCE_TILE_PX:
-        return "too_small", None, None
-    arr = np.array(tile)
-    mask = ocean_mask(arr[:, :, :3]) if want_color_pass else None
-    return "ok", arr, mask
+        return "too_small", None
+    return "ok", np.array(tile)
 
 
 def _stitch_region(
@@ -179,18 +188,15 @@ def _stitch_region(
     Either way the work happens at each tile's native resolution, before
     the downscale to ``tp``.  Afterwards the downscale has already blended
     dark open ocean into light coastal water across every coast tile, and
-    no exact-colour match can undo that.
+    no mask can undo that.
 
-    Neither colour pass is applied to every pixel that matches, though.
-    :func:`hfwm.imaging.ocean.reachable_sea_pixels` decides whether an ocean-coloured
-    pixel is trusted at all — 4-connected to a tile confidently read as
-    open water, or a coincidence (a lake, a river, a patch of terrain
-    shading, a building's stonework, that happens to land in the ocean
-    palette). That needs every tile's mask assembled into one region-wide
-    canvas before it can decide anything, so tiles are loaded and measured
-    in a first pass below, then assembled, decided and coloured as a
-    whole in a second — never per tile, or a coincidental match sitting
-    next to real water in the same tile would be swept in with it.
+    Neither pass touches a pixel the terrain does not call open sea:
+    :func:`hfwm.gamedata.ocean_water.ocean_cells` says which cells of each
+    source tile are deep ocean water, whatever colour the minimap baker
+    painted them, so a lake, a river, a canal or dry land that merely
+    renders dark is never swept in. The masks are assembled into one
+    region-wide canvas and applied at the stitch resolution, after every
+    tile has been pasted.
     """
     from PIL import Image
 
@@ -233,7 +239,7 @@ def _stitch_region(
             continue
         keyed_paths.append((r, c, path))
 
-    def _apply_decoded(r: int, c: int, status: str, arr, mask) -> None:
+    def _apply_decoded(r: int, c: int, status: str, arr) -> None:
         nonlocal too_small, unreadable
         if status == "unreadable":
             unreadable += 1
@@ -241,6 +247,8 @@ def _stitch_region(
             too_small += 1
         else:
             if want_color_pass:
+                mask = _ocean_pixels(
+                    region["map_id"], r, c, arr.shape[1], arr.shape[0])
                 ocean_fracs[(r, c)] = float(mask.mean())
                 tile_masks[(r, c)] = mask
             opened[(r, c)] = Image.fromarray(arr, "RGBA")
@@ -254,13 +262,12 @@ def _stitch_region(
 
             with ProcessPoolExecutor(max_workers=_PARALLEL_DECODE_WORKERS) as ex:
                 results = ex.map(
-                    _decode_and_measure,
+                    _decode_tile,
                     [p for _, _, p in keyed_paths],
-                    [want_color_pass] * len(keyed_paths),
                     chunksize=8,
                 )
-                for (r, c, _path), (status, arr, mask) in zip(keyed_paths, results):
-                    _apply_decoded(r, c, status, arr, mask)
+                for (r, c, _path), (status, arr) in zip(keyed_paths, results):
+                    _apply_decoded(r, c, status, arr)
         except Exception:
             # Any pool-related failure (platform quirk, pickling limit,
             # resource exhaustion) -- fall back to the always-correct
@@ -273,26 +280,15 @@ def _stitch_region(
             too_small = 0
             unreadable = 0
             for r, c, path in keyed_paths:
-                status, arr, mask = _decode_and_measure(path, want_color_pass)
-                _apply_decoded(r, c, status, arr, mask)
+                status, arr = _decode_tile(path)
+                _apply_decoded(r, c, status, arr)
     else:
         for r, c, path in keyed_paths:
-            status, arr, mask = _decode_and_measure(path, want_color_pass)
-            _apply_decoded(r, c, status, arr, mask)
+            status, arr = _decode_tile(path)
+            _apply_decoded(r, c, status, arr)
 
-    # A cell confidently read as open water — the seed a pixel-level
-    # match has to trace a path back to (see reachable_sea_pixels) before
-    # anything erases or recolours it.
-    oceanic_cells = {
-        cell for cell, frac in ocean_fracs.items()
-        if frac >= OCEAN_TILE_FRACTION
-    }
-
-    # --- Pass 2: assemble, decide, paste ---------------------------------
+    # --- Pass 2: assemble, paste ----------------------------------------
     region_mask = (
-        np.zeros((sh, sw), dtype=bool) if want_color_pass else None
-    )
-    seed_mask = (
         np.zeros((sh, sw), dtype=bool) if want_color_pass else None
     )
 
@@ -310,8 +306,6 @@ def _stitch_region(
                 mask_img = Image.fromarray(mask.astype(np.uint8) * 255)
                 mask = np.array(mask_img.resize((tp, tp), Image.NEAREST)) > 0
             region_mask[y0:y0 + tp, x0:x0 + tp] = mask
-            if (r, c) in oceanic_cells:
-                seed_mask[y0:y0 + tp, x0:x0 + tp] = True
 
         if (w, h) != (tp, tp):
             # gotchas.md 1.2: some legitimate minimap tiles ship at 256px.
@@ -329,14 +323,12 @@ def _stitch_region(
         loaded += 1
 
     if want_color_pass and region_mask.any():
-        reachable = reachable_sea_pixels(region_mask, seed_mask)
-        if reachable.any():
-            arr = np.array(stitch)
-            if sea_mode == "unify":
-                apply_unify(arr, reachable, ocean_rgb)
-            else:
-                apply_erase(arr, reachable)
-            stitch = Image.fromarray(arr)
+        arr = np.array(stitch)
+        if sea_mode == "unify":
+            apply_unify(arr, region_mask, ocean_rgb)
+        else:
+            apply_erase(arr, region_mask)
+        stitch = Image.fromarray(arr)
 
     stats = {
         "loaded": loaded,
@@ -670,7 +662,7 @@ def process_zone(
     if want_alpha_sea:
         # Plain paste, not alpha_composite.  Compositing would resolve every
         # transparent pixel against the canvas and throw away the sea colour
-        # that erase_tile() deliberately left in the RGB channels, which is
+        # that apply_erase() deliberately left in the RGB channels, which is
         # what keeps the coastline downscaling into sea rather than into
         # black.  There is nothing to composite against anyway: the canvas
         # here is empty by construction.

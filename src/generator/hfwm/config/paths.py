@@ -34,6 +34,8 @@ DB2_CACHE_DIR = CACHE_ROOT / "db2"
 DONOR_DB2_CACHE_DIR = CACHE_ROOT / "donor-db2"
 WDT_CACHE_DIR = CACHE_ROOT / "wdt"
 MINIMAP_TILE_CACHE = CACHE_ROOT / "minimap"
+# Per-ADT depth of the open sea (hfwm.gamedata.ocean_water).
+OCEAN_CELLS_CACHE = CACHE_ROOT / "ocean_cells"
 MINIMAP_DB_CACHE = CACHE_ROOT / "minimap_db.json"
 INTERIOR_PRESENCE_CACHE = CACHE_ROOT / "interior_presence.json"
 

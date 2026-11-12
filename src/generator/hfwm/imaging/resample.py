@@ -4,7 +4,7 @@ Pillow resamples RGBA images in premultiplied space and divides the alpha
 back out afterwards, which is correct for compositing but destroys the RGB
 of any pixel whose alpha is zero — 0/0 comes back as black.  That matters
 here because the sea is erased by clearing *only* the alpha
-(:func:`hfwm.imaging.ocean.erase_tile`), which deliberately leaves its real
+(:func:`hfwm.imaging.ocean.apply_erase`), which deliberately leaves its real
 colour in the RGB channels so the coastline downscales into sea rather
 than into black.  One ordinary ``Image.resize`` and the sea is black
 again, halo and all.
