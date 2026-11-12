@@ -1018,7 +1018,7 @@ local options = {
                 continentAreaLabels = AreaLabelSection(24, "Continents",
                     AREA_LABEL_KINDS.continent,
                     "Shows the names of continents, such as Eastern "
-                        .. "Kingdoms, on their continent maps."),
+                        .. "Kingdoms, on their continent maps and on the World map."),
                 capitalAreaLabels = AreaLabelSection(23, "Capital Cities",
                     AREA_LABEL_KINDS.capital,
                     "Shows the names of capital cities, such as "

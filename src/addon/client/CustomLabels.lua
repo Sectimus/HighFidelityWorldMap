@@ -5,7 +5,7 @@
 -- data classes differently (or not at all). Read by AreaLabels.lua. Not
 -- generated; edit freely.
 --
--- [uiMapID] = { { name, kind, u, v [, text, h] }, ... }
+-- [uiMapID] = { { name, kind, u, v [, text, h, scale, spacing] }, ... }
 --   name  the text shown when no text is given. Matched against AreaLabelData.lua
 --         by name and kind: a shown custom label hides the same-named area label
 --         of the same kind on that map. Different kinds are shown alongside.
@@ -19,6 +19,8 @@
 --   u, v  the centre in 0-1 map coordinates from the map's top-left.
 --   h     optional label height in canvas units at scale 1; defaults per kind
 --         (AreaLabels.lua's DEFAULT_H).
+--   scale optional size multiplier for this label alone, above 0 (default 1).
+--   spacing optional letter spacing, added to the kind's Letter spacing (default 0).
 --   hide  optional true: draws nothing, but hides the same-named same-kind area
 --         label on that map (removes a generated label).
 -- Example:
@@ -293,5 +295,23 @@ HFWMF_CUSTOM_LABELS = {
         { name = "Magram Front", kind = "poi", u = 0.612, v = 0.569 },
         { name = "Forlorn Gardens", text = "Forlorn\nGardens", kind = "poi", u = 0.742, v = 0.755 },
         { name = "Bristleback Retreat", text = "Bristleback\nRetreat", kind = "poi", u = 0.642, v = 0.228 },
+    },
+    [1414] = {
+        { name = "Kalimdor", kind = "continent", text = "K", u = 0.3666, v = 0.5125, scale = 1.2375 },
+        { name = "Kalimdor", kind = "continent", text = "alimdor", u = 0.514, v = 0.5149, scale = 1.105, spacing = 0.20 },
+    },
+    [1415] = {
+        { name = "Eastern Kingdoms", kind = "continent", text = "E", u = 0.3586, v = 0.5723, scale = 1.27 },
+        { name = "Eastern Kingdoms", kind = "continent", text = "astern", u = 0.4556, v = 0.5751, scale = 1.01, spacing = -0.02 },
+        { name = "Eastern Kingdoms", kind = "continent", text = "K", u = 0.4267, v = 0.621, scale = 1.29 },
+        { name = "Eastern Kingdoms", kind = "continent", text = "ingdoms", u = 0.5461, v = 0.6231, scale = 1.05 },
+    },
+    [947] = {
+        { name = "Eastern Kingdoms", kind = "continent", text = "E", u = 0.6637, v = 0.5681 },
+        { name = "Eastern Kingdoms", kind = "continent", text = "astern", u = 0.7397, v = 0.5711, scale = 0.79, spacing = -0.04 },
+        { name = "Eastern Kingdoms", kind = "continent", text = "K", u = 0.6467, v = 0.6041 },
+        { name = "Eastern Kingdoms", kind = "continent", text = "ingdoms", u = 0.7397, v = 0.6061, scale = 0.72, spacing = 0.16 },
+        { name = "Kalimdor", kind = "continent", text = "K", u = 0.1204, v = 0.4811, scale = 1.15 },
+        { name = "Kalimdor", kind = "continent", text = "alimdor", u = 0.2373, v = 0.4821, scale = 1.02, spacing = 0.01 },
     },
 }

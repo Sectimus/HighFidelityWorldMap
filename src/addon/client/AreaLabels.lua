@@ -28,7 +28,7 @@ local WorldMapFrame = _G.WorldMapFrame
 local AREA_LABELS = HFWMF_AREA_LABELS or {}
 
 --- Hand-kept labels from CustomLabels.lua, same shape as AREA_LABELS entries
---- (h optional). Each shows under its kind's Include Custom toggle; kind
+--- (h, scale, spacing optional). Each shows under its kind's Include Custom toggle; kind
 --- "poi" shows with the Points of Interest type itself.
 local CUSTOM_LABELS = HFWMF_CUSTOM_LABELS or {}
 
@@ -188,7 +188,7 @@ local function Paint(l, label, x, y, scale, opaque)
     local banded = vertical and opaque
     local o = Config.db[key .. "Outline"]
     local grad = gradient and not vertical and { a, b } or nil
-    local gap = Config.db[key .. "Spacing"] * size
+    local gap = (Config.db[key .. "Spacing"] + (label.spacing or 0)) * size
     local font = FontFor(key)
     local shown = label.text or label.name
     if Config.db[key .. "Uppercase"] then shown = shown:upper() end
@@ -307,8 +307,8 @@ local function ZoomFade(kind)
     local key = KIND[kind].color
     local step = LadderStep()
     step = step or 0 -- ladder not built yet: the zone view's default is level 0
-    local vis = Config:FadeStep(key .. "FadeVisibleAt")
     if not Config.db[key .. "ZoomFade"] then return 1 end
+    local vis = Config:FadeStep(key .. "FadeVisibleAt")
     local inv = Config:FadeStep(key .. "FadeInvisibleAt")
     if vis == inv then return step >= vis and 1 or 0 end
     if inv > vis and step < vis then
@@ -368,7 +368,7 @@ function AreaLabels:Refresh()
         return false
     end
     local custom, shadowed = {}, {}
-    for _, p in ipairs(all and CUSTOM_LABELS[mapID] or {}) do
+    for _, p in ipairs(canvas and Config.db.enabled and CUSTOM_LABELS[mapID] or {}) do
         local k = KIND[p.kind]
         if p.hide then
             shadowed[p.kind .. "|" .. p.name] = true
@@ -428,8 +428,8 @@ function AreaLabels:Refresh()
             labelFrames[i] = l
         end
         local alpha = ZoomFade(label.kind) * Config.db[KIND[label.kind].color .. "Opacity"]
-        Paint(l, label, label.u * w, -label.v * h, AreaLabelScale(label.kind),
-            alpha * frameAlpha >= 1)
+        Paint(l, label, label.u * w, -label.v * h,
+            AreaLabelScale(label.kind) * (label.scale or 1), alpha * frameAlpha >= 1)
         Fade(l, alpha)
     end
     for i = #labels + 1, #labelFrames do
