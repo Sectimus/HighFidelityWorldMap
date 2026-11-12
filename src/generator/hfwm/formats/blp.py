@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import struct
 
-from ..imaging.resample import resize_rgba
-
 BLP2_HEADER_SIZE = 148
 BLP2_PALETTE_SIZE = 1024
 BLP2_ENCODING_UNCOMPRESSED_BGRA = 3
@@ -25,14 +23,10 @@ def _generate_mips(img):
         mips.append(current.tobytes("raw", "BGRA"))
         if w == 1 and h == 1:
             break
-        # resize_rgba so a sea that was erased by clearing only its alpha
-        # keeps its colour down the whole chain: a mip that had zeroed it
-        # would blend every part-transparent coast pixel towards black
-        # rather than towards sea, fringing the coastline as the map zooms.
-        # NUM_MIP_LEVELS is 1, so this is insurance rather than load-bearing;
-        # it is here so that raising it stays safe.
-        current = resize_rgba(
-            current, (max(w // 2, 1), max(h // 2, 1)), _Img.BOX)
+        # Premultiplied, so an erased sea contributes no colour to a mip;
+        # the colour bleed that makes the coast safe runs at encode time.
+        current = current.resize(
+            (max(w // 2, 1), max(h // 2, 1)), _Img.BOX)
     return mips
 
 

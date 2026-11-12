@@ -1,42 +1,32 @@
-"""Resizing that does not throw away the colour under transparent pixels.
+"""Colour bleed for alpha-erased art.
 
-Pillow resamples RGBA images in premultiplied space and divides the alpha
-back out afterwards, which is correct for compositing but destroys the RGB
-of any pixel whose alpha is zero — 0/0 comes back as black.  That matters
-here because the sea is erased by clearing *only* the alpha
-(:func:`hfwm.imaging.ocean.erase_tile`), which deliberately leaves its real
-colour in the RGB channels so the coastline downscales into sea rather
-than into black.  One ordinary ``Image.resize`` and the sea is black
-again, halo and all.
+The sea is erased by clearing only its alpha (:func:`hfwm.imaging.ocean.apply_erase`).
+Its RGB under alpha 0 is near-black, so any filter that reads RGB across a
+coastline pulls the land colour towards black: the dark halo.
 
-Resampling the channels separately avoids it: the colour plane never sees
-the alpha plane, so a transparent pixel contributes its colour to its
-neighbours and keeps its own.  The visible consequence at a coastline is
-that a part-transparent fringe pixel blends land into *sea* rather than
-land into black, which is both what the raw stitch does and the better
-input to alpha blending — part-black at partial alpha is the classic dark
-halo.
-
-Use this for every resize of an image whose transparent regions carry
-meaning.  Plain ``Image.resize`` is still right for opaque images and for
-ones where transparent means "nothing here".
+Pillow's RGBA ``resize`` works in premultiplied space, so transparent pixels
+contribute no colour and downscaling is correct. What remains is the
+transparent pixels themselves: the GPU bilinear-samples RGB and alpha
+independently, so a sample straddling land and an alpha-0 neighbour still
+blends towards that neighbour's RGB. :func:`bleed_colour` fixes this by
+copying the nearest opaque colour into every alpha-0 pixel within a radius.
 """
 
+import numpy as np
+from PIL import Image
+from scipy import ndimage
 
-def resize_rgba(img, size, resample=None):
-    """Resize *img* to *size*, preserving RGB under fully transparent pixels.
 
-    *img* must be RGBA.  Returns a new image; the input is untouched.
+def bleed_colour(img, radius: int):
+    """Return a copy of RGBA *img* with each alpha-0 pixel within *radius* of
+    an opaque-enough pixel set to that pixel's colour. Alpha is unchanged.
     """
-    from PIL import Image
-
-    if resample is None:
-        resample = Image.LANCZOS
-    if img.size == tuple(size):
+    arr = np.array(img)
+    known = arr[:, :, 3] > 0
+    if not known.any() or known.all():
         return img.copy()
-
-    rgb = img.convert("RGB").resize(size, resample)
-    alpha = img.getchannel("A").resize(size, resample)
-    out = rgb.convert("RGBA")
-    out.putalpha(alpha)
-    return out
+    dist, (iy, ix) = ndimage.distance_transform_edt(~known, return_indices=True)
+    near = (dist > 0) & (dist <= radius)
+    rgb = arr[:, :, :3]
+    rgb[near] = rgb[iy[near], ix[near]]
+    return Image.fromarray(arr, "RGBA")
