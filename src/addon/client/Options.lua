@@ -119,6 +119,7 @@ local AREA_LABEL_KINDS = {
 local function AreaLabelKeys(k)
     local keys = { k.show, k.scale }
     if k.auto then keys[#keys + 1] = k.auto end
+    keys[#keys + 1] = k.color .. "IgnoreGlobal"
     for _, suffix in ipairs({ "ColorMode", "Color", "Color2", "GradientDir", "Outline", "Font", "IncludeCustom", "Uppercase", "Spacing", "Opacity" }) do
         keys[#keys + 1] = k.color .. suffix
     end
@@ -287,6 +288,18 @@ local function AreaLabelGroup(order, title, k, desc)
                 type = "description",
                 width = 1,
                 name = "",
+            },
+            ignoreGlobal = {
+                order = 14,
+                type = "toggle",
+                name = "Ignore global scale",
+                desc = "The Global label scale slider does not affect these labels.",
+                hidden = function() return not Config.db[showKey] end,
+                get = function() return Config.db[colorKey .. "IgnoreGlobal"] end,
+                set = function(_, value)
+                    Config.db[colorKey .. "IgnoreGlobal"] = value
+                    ns.AreaLabels:Refresh()
+                end,
             },
             includeCustom = {
                 order = 16,

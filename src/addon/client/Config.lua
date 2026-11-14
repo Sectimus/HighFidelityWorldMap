@@ -147,7 +147,14 @@ Config.DEFAULTS = {
     areaLabelScale = 2,
     -- Per-type label scales, each on top of areaLabelScale. Stored as the actual
     -- multiplier; the Options sliders show each as a percent of its default.
-    continentAreaLabelScale = 1,
+    continentAreaLabelScale = 0.6,
+    -- Ignore global scale (per type): when on, the Global label scale does not
+    -- affect that type; it is sized against the default Global scale instead.
+    continentAreaLabelIgnoreGlobal = true,
+    capitalAreaLabelIgnoreGlobal = false,
+    townAreaLabelIgnoreGlobal = false,
+    subzoneAreaLabelIgnoreGlobal = false,
+    districtAreaLabelIgnoreGlobal = false,
     capitalAreaLabelScale = 1.35,
     townAreaLabelScale = 1.3,
     subzoneAreaLabelScale = 0.36,
@@ -241,14 +248,14 @@ Config.DEFAULTS = {
     -- Config.AREA_LABEL_FONTS. areaLabelFont is the Global Font; each type's
     -- <color>Font is a path of its own, or "global" to follow the Global Font.
     areaLabelFont = "Fonts\\FRIZQT__.TTF",
-    continentAreaLabelFont = "global",
+    continentAreaLabelFont = "Fonts\\FRIZQT__.TTF",
     capitalAreaLabelFont = "Fonts\\SKURRI.TTF",
     townAreaLabelFont = "global",
     subzoneAreaLabelFont = "global",
     districtAreaLabelFont = "Fonts\\SKURRI.TTF",
     -- Uppercase (Options): draws the label's text in capital letters. Off by
     -- default.
-    continentAreaLabelUppercase = false,
+    continentAreaLabelUppercase = true,
     capitalAreaLabelUppercase = false,
     townAreaLabelUppercase = false,
     subzoneAreaLabelUppercase = false,
@@ -256,7 +263,7 @@ Config.DEFAULTS = {
     poiAreaLabelUppercase = false,
     -- Letter spacing (Options): space between letters, as a fraction of the text
     -- size. 0 is the font's own spacing.
-    continentAreaLabelSpacing = 0,
+    continentAreaLabelSpacing = 0.43,
     capitalAreaLabelSpacing = 0.1,
     townAreaLabelSpacing = 0,
     subzoneAreaLabelSpacing = 0,
@@ -283,6 +290,7 @@ Config.DEFAULTS = {
     showAreaPOIs = true,
     -- 60% of the Towns and hubs scale (1.3), which Options' Label scale reads against.
     poiAreaLabelScale = 0.78,
+    poiAreaLabelIgnoreGlobal = true,
     poiAreaLabelColorMode = "solid",
     poiAreaLabelColor = { 1, 247 / 255, 227 / 255 },
     poiAreaLabelColor2 = { 1, 200 / 255, 90 / 255 },
