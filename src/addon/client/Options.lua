@@ -1454,17 +1454,15 @@ local function ShowLogo(frame, reset)
     UpdatePreview()
 end
 
---- The world map is shown behind the HFWM settings pages, and closed again
---- when the player leaves them. It only closes a map this shows itself, so a
---- map the player already had open stays open. The Settings panel draws above
---- the map's HIGH strata, so the map drops to MAP_STRATA while the pages are
---- up and goes back to its own strata when they are left. Once the player
---- uses Close preview, moving between pages does not reopen the map until
---- every HFWM page has been left.
+--- The world map is only shown behind the HFWM settings pages when the player
+--- uses a page's Open preview button; pages never open it themselves. It is
+--- closed again when the player leaves the pages, and only a map this opened:
+--- a map the player already had open stays open. The Settings panel draws
+--- above the map's HIGH strata, so the map drops to MAP_STRATA while the pages
+--- are up and goes back to its own strata when they are left.
 local MAP_STRATA = "MEDIUM"
 local panelFrames = {}
 local mapShownHere = false
-local previewDismissed = false  -- Close preview used since the pages opened
 local mapStrata  -- the map's own strata, while it is lowered
 
 local function AnyPanelShown()
@@ -1531,10 +1529,6 @@ end
 
 local function PanelShown(frame)
     panelFrames[frame] = true
-    if previewDismissed then return end
-    local opening = not _G.WorldMapFrame:IsShown()
-    OpenMap(frame)
-    if opening and _G.WorldMapFrame:IsShown() then mapShownHere = true end
 end
 
 local function PanelHidden()
@@ -1542,7 +1536,6 @@ local function PanelHidden()
     -- so only restore once no HFWM page is visible.
     C_Timer.After(0, function()
         if AnyPanelShown() then return end
-        previewDismissed = false
         local map = _G.WorldMapFrame
         if mapStrata then
             map:SetFrameStrata(mapStrata)
@@ -1556,16 +1549,15 @@ local function PanelHidden()
 end
 
 --- Open or close the world map from a page's preview button. Opening it sits
---- it behind the Settings page, as the automatic open does, and it stays open
---- when the page is left.
+--- it behind the Settings page, and it is closed again when the pages are
+--- left.
 function PreviewToggle(frame)
     if _G.WorldMapFrame:IsShown() then
-        previewDismissed = true
         mapShownHere = false
         CloseMap()
     else
-        previewDismissed = false
         OpenMap(frame)
+        mapShownHere = _G.WorldMapFrame:IsShown()
     end
 end
 
