@@ -265,8 +265,12 @@ end
 --- both scale with the canvas, so zooming out shrinks a label on screen;
 --- Auto-scale grows it back by that ratio, and zooming in shrinks it.
 local function AreaLabelScale(kind)
-    local scale = Config.db.areaLabelScale * Config.db[KIND[kind].scale]
-    local auto = KIND[kind].auto
+    local k = KIND[kind]
+    -- Ignore global scale: the kind is sized against the default Global scale.
+    local global = Config.db[k.color .. "IgnoreGlobal"] and Config.DEFAULTS.areaLabelScale
+        or Config.db.areaLabelScale
+    local scale = global * Config.db[k.scale]
+    local auto = k.auto
     if not (auto and Config.db[auto]) then return scale end
     local sc = WorldMapFrame.ScrollContainer
     local levels = sc and sc.zoomLevels
