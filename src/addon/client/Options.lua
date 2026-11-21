@@ -944,7 +944,7 @@ local options = {
                         .. "the same corner. It stays inside the map, and its "
                         .. "position is remembered even if this is turned off. "
                         .. "Reset to defaults puts it back.",
-                    disabled = function() return not Config.db.toggleButtonEnabled end,
+                    hidden = function() return not Config.db.toggleButtonEnabled end,
                     get = function() return Config.db.toggleButtonMovable end,
                     set = function(_, value)
                         Config.db.toggleButtonMovable = value
@@ -957,7 +957,7 @@ local options = {
                     desc = "Remember the HD/SD state based upon map types (So it is "
                         .. "possible to keep the Zone level view at HD meanwhile "
                         .. "continent level is at SD etc.)",
-                    disabled = function() return not Config.db.toggleButtonEnabled end,
+                    hidden = function() return not Config.db.toggleButtonEnabled end,
                     get = function() return Config.db.rememberAlphaPerMapType end,
                     set = function(_, value)
                         Config.db.rememberAlphaPerMapType = value
@@ -971,13 +971,54 @@ local options = {
                     name = "Persist map state",
                     desc = "Remember the HD/SD state independantly for the "
                         .. "fullscreen/windowed versions of the world map pane",
-                    disabled = function() return not Config.db.toggleButtonEnabled end,
+                    hidden = function() return not Config.db.toggleButtonEnabled end,
                     get = function() return Config.db.rememberAlphaPerMapState end,
                     set = function(_, value)
                         Config.db.rememberAlphaPerMapState = value
                         ns.Renderer:ForceRefresh()
                         ns.ToggleButton:Refresh()
                     end,
+                },
+                states = {
+                    order = 30,
+                    type = "group",
+                    inline = true,
+                    name = "States:",
+                    hidden = function() return not Config.db.toggleButtonEnabled end,
+                    args = {
+                        stateZone = {
+                            order = 1,
+                            type = "select",
+                            name = "Zone Map",
+                            values = { hd = "HD", sd = "SD" },
+                            get = function() return Config.db.alphas.zone >= 0.5 and "hd" or "sd" end,
+                            set = function(_, v) Config.db.alphas.zone = v == "hd" and 1.0 or 0.0; ns.Renderer:ForceRefresh(); ns.ToggleButton:Refresh() end,
+                        },
+                        stateContinent = {
+                            order = 2,
+                            type = "select",
+                            name = "Continent Map",
+                            values = { hd = "HD", sd = "SD" },
+                            get = function() return Config.db.alphas.continent >= 0.5 and "hd" or "sd" end,
+                            set = function(_, v) Config.db.alphas.continent = v == "hd" and 1.0 or 0.0; ns.Renderer:ForceRefresh(); ns.ToggleButton:Refresh() end,
+                        },
+                        stateWorld = {
+                            order = 3,
+                            type = "select",
+                            name = "World Map",
+                            values = { hd = "HD", sd = "SD" },
+                            get = function() return Config.db.alphas.world >= 0.5 and "hd" or "sd" end,
+                            set = function(_, v) Config.db.alphas.world = v == "hd" and 1.0 or 0.0; ns.Renderer:ForceRefresh(); ns.ToggleButton:Refresh() end,
+                        },
+                        stateCity = {
+                            order = 4,
+                            type = "select",
+                            name = "City Map",
+                            values = { hd = "HD", sd = "SD" },
+                            get = function() return Config.db.alphas.city >= 0.5 and "hd" or "sd" end,
+                            set = function(_, v) Config.db.alphas.city = v == "hd" and 1.0 or 0.0; ns.Renderer:ForceRefresh(); ns.ToggleButton:Refresh() end,
+                        },
+                    },
                 },
             },
         },
