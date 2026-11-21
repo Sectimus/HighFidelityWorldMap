@@ -507,10 +507,14 @@ function Commands:Handle(msg)
         self:Debug()
         return
     elseif cmd == "" then
+        ns.Options:Open()
+        return
+    elseif cmd == "toggle" then
         db.enabled = not db.enabled
     else
         print("|cff33ccffHigh Fidelity World Map|r commands:")
-        print("  /hfwm               - toggle overlay")
+        print("  /hfwm               - open these settings")
+        print("  /hfwm toggle        - toggle overlay")
         print("  /hfwm on|off        - enable / disable")
         local keys = {}
         for _, bg in ipairs(Config:AvailableBackgrounds()) do

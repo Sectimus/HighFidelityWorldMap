@@ -80,6 +80,36 @@ local function NoAreaLabelsOn()
         or Config.db.showAreaCityDistricts or Config.db.showAreaPOIs)
 end
 
+--- One HD/SD States dropdown for a map type (*mapKey*: zone, continent, world
+--- or city). It reads and writes the same alphas[] slot the HD/SD button uses
+--- for that map type: the type's own slot when Persist map type is on, the
+--- shared `all` slot when off, and the windowed/fullscreen prefix when Persist
+--- map state is on. HD is 1.0, SD is 0.0. Writing goes through
+--- ToggleButton:SetBlendForKey, so the overlay and labels update as the button
+--- does.
+local function StateDropdown(order, mapKey, label, prefix)
+    local function SlotKey()
+        local key = Config.db.rememberAlphaPerMapType and mapKey or "all"
+        if Config.db.rememberAlphaPerMapState and prefix then
+            return prefix .. ":" .. key
+        end
+        return key
+    end
+    return {
+        order = order,
+        type = "select",
+        name = label,
+        values = { hd = "HD", sd = "SD" },
+        get = function()
+            local v = Config.db.alphas[SlotKey()] or 1.0
+            return v > 0.5 and "hd" or "sd"
+        end,
+        set = function(_, v)
+            ns.ToggleButton:SetBlendForKey(SlotKey(), v == "hd" and 1.0 or 0.0)
+        end,
+    }
+end
+
 local SECTION_RESET = "HFWM-SectionReset"  -- registered below, with the widgets
 -- The Config.db fields of each label kind: the show toggle, scale, Auto-scale
 -- and the prefix of its <color>ColorMode / Color / Color2 / GradientDir /
@@ -916,33 +946,108 @@ local options = {
             end,
         },
 
-        toggleButtonEnabled = {
+        hdSdToggle = {
             order = 72,
-            type = "toggle",
+            type = "group",
+            inline = true,
             name = "HD/SD Toggle",
-            desc = "Adds a small red button to the top-right corner of the "
-                .. "world map pane to switch between hfwm and vanilla map "
-                .. "tiles",
-            get = function() return Config.db.toggleButtonEnabled end,
-            set = function(_, value)
-                Config.db.toggleButtonEnabled = value
-                ns.ToggleButton:Refresh()
-            end,
-        },
-        toggleButtonMovable = {
-            order = 73,
-            type = "toggle",
-            name = "Moveable toggle",
-            desc = "Lets you click and drag the HD/SD button to another "
-                .. "spot on the world map, for when another addon uses "
-                .. "the same corner. It stays inside the map, and its "
-                .. "position is remembered even if this is turned off. "
-                .. "Reset to defaults puts it back.",
-            disabled = function() return not Config.db.toggleButtonEnabled end,
-            get = function() return Config.db.toggleButtonMovable end,
-            set = function(_, value)
-                Config.db.toggleButtonMovable = value
-            end,
+            args = {
+                toggleButtonEnabled = {
+                    order = 10,
+                    type = "toggle",
+                    name = "Enabled",
+                    desc = "Adds a small red button to the top-right corner of the "
+                        .. "world map pane to switch between hfwm and vanilla map "
+                        .. "tiles",
+                    get = function() return Config.db.toggleButtonEnabled end,
+                    set = function(_, value)
+                        Config.db.toggleButtonEnabled = value
+                        ns.ToggleButton:Refresh()
+                    end,
+                },
+                toggleButtonMovable = {
+                    order = 40,
+                    type = "toggle",
+                    name = "Moveable toggle",
+                    desc = "Lets you click and drag the HD/SD button to another "
+                        .. "spot on the world map, for when another addon uses "
+                        .. "the same corner. It stays inside the map, and its "
+                        .. "position is remembered even if this is turned off. "
+                        .. "Reset to defaults puts it back.",
+                    hidden = function() return not Config.db.toggleButtonEnabled end,
+                    get = function() return Config.db.toggleButtonMovable end,
+                    set = function(_, value)
+                        Config.db.toggleButtonMovable = value
+                    end,
+                },
+                rememberAlphaPerMapType = {
+                    order = 20,
+                    type = "toggle",
+                    name = "Persist map type",
+                    desc = "Remember the HD/SD state based upon map types (So it is "
+                        .. "possible to keep the Zone level view at HD meanwhile "
+                        .. "continent level is at SD etc.)",
+                    hidden = function() return not Config.db.toggleButtonEnabled end,
+                    get = function() return Config.db.rememberAlphaPerMapType end,
+                    set = function(_, value)
+                        Config.db.rememberAlphaPerMapType = value
+                        ns.Renderer:ForceRefresh()
+                        ns.ToggleButton:Refresh()
+                    end,
+                },
+                rememberAlphaPerMapState = {
+                    order = 11,
+                    type = "toggle",
+                    name = "Persist map state",
+                    desc = "Remember the HD/SD state independantly for the "
+                        .. "fullscreen/windowed versions of the world map pane",
+                    get = function() return Config.db.rememberAlphaPerMapState end,
+                    set = function(_, value)
+                        Config.db.rememberAlphaPerMapState = value
+                        ns.Renderer:ForceRefresh()
+                        ns.ToggleButton:Refresh()
+                    end,
+                },
+                states = {
+                    order = 30,
+                    type = "group",
+                    inline = true,
+                    name = "States:",
+                    hidden = function() return Config.db.toggleButtonEnabled or Config.db.rememberAlphaPerMapState end,
+                    args = {
+                        stateZone = StateDropdown(1, "zone", "Zone Map"),
+                        stateContinent = StateDropdown(2, "continent", "Continent Map"),
+                        stateWorld = StateDropdown(3, "world", "World Map"),
+                        stateCity = StateDropdown(4, "city", "City Map"),
+                    },
+                },
+                windowedStates = {
+                    order = 30,
+                    type = "group",
+                    inline = true,
+                    name = "Windowed States",
+                    hidden = function() return Config.db.toggleButtonEnabled or not Config.db.rememberAlphaPerMapState end,
+                    args = {
+                        stateZone = StateDropdown(1, "zone", "Zone Map", "windowed"),
+                        stateContinent = StateDropdown(2, "continent", "Continent Map", "windowed"),
+                        stateWorld = StateDropdown(3, "world", "World Map", "windowed"),
+                        stateCity = StateDropdown(4, "city", "City Map", "windowed"),
+                    },
+                },
+                fullscreenStates = {
+                    order = 31,
+                    type = "group",
+                    inline = true,
+                    name = "Fullscreen States",
+                    hidden = function() return Config.db.toggleButtonEnabled or not Config.db.rememberAlphaPerMapState end,
+                    args = {
+                        stateZone = StateDropdown(1, "zone", "Zone Map", "full"),
+                        stateContinent = StateDropdown(2, "continent", "Continent Map", "full"),
+                        stateWorld = StateDropdown(3, "world", "World Map", "full"),
+                        stateCity = StateDropdown(4, "city", "City Map", "full"),
+                    },
+                },
+            },
         },
         mapBackground = {
             order = 75,
@@ -1675,6 +1780,7 @@ function Options:Init()
     local ok, err = pcall(function()
         local frame, category = RegisterClientPanel(
             AceConfigDialog, MAIN_APP, PANEL_TITLE)
+        Options.mainCategory = category
         frames[#frames + 1] = { frame, MAIN_PAGE }
         for _, page in ipairs(SUB_PAGES) do
             frame = RegisterClientPanel(
@@ -1694,6 +1800,15 @@ function Options:Init()
     registered = ok
     self.clientRegistered = ok
     for _, f in ipairs(frames) do ShowLogo(f[1], f[2]) end
+end
+
+--- Open the HFWM page in the client's Settings window. Uses the category
+--- kept at registration with Blizzard's OpenToCategory, not a panel name,
+--- so the Settings panel is not tainted (see RegisterClientPanel).
+function Options:Open()
+    local category = self.mainCategory
+    if not category or not _G.Settings or not _G.Settings.OpenToCategory then return end
+    _G.Settings.OpenToCategory(category:GetID())
 end
 
 --- Push a live setting change (from a slash command, say) out to any open

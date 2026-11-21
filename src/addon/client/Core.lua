@@ -2,7 +2,8 @@
 -- High Fidelity World Map -- Bootstrap
 -- Wires up events and hooks once Ace3 initializes the addon.
 --
--- /hfwm             - toggle on / off
+-- /hfwm             - open settings
+-- /hfwm toggle      - switch the HD/SD overlay on / off
 -- /hfwm on|off      - explicit enable / disable
 -- /hfwm bg NAME     - map background: default | ocean | hybrid
 -- /hfwm cave        - the cave map window (on|off|show|hide|reset|alpha N|indoors)
@@ -167,7 +168,7 @@ function addon:OnEnable()
     -- After Commands, so a Lua error while probing the client's options
     -- APIs still leaves the slash commands working.
     Options:Init()
-    P("Loaded. /hfwm to toggle; settings are in Esc > Options > AddOns.")
+    P("Loaded. /hfwm opens settings; /hfwm toggle switches the overlay.")
 end
 
 --- Warm the texture cache for the player's zone (Renderer:Preload), on
