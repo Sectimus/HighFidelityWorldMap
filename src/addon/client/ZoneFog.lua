@@ -83,6 +83,24 @@ function ZoneFog:RecordVisit(zoneID)
     db.visited[zoneID] = true
 end
 
+--- True when an explored rect (C_MapExplorationInfo, layer pixels) lies inside
+--- the box of a visit-gated zone on *mapID* that this character has not visited.
+--- Such rects are Moonglade's continent-level overlay and must not be drawn.
+function ZoneFog:RectGated(mapID, rect, layerW, layerH)
+    local shapes = SHAPES[mapID]
+    if not shapes then return false end
+    local cx = (rect.offsetX + rect.textureWidth / 2) / layerW
+    local cy = (rect.offsetY + rect.textureHeight / 2) / layerH
+    for _, shape in ipairs(shapes) do
+        local zone = shape[1]
+        if VISIT_GATED[zone] and cx >= shape[2] and cx <= shape[4]
+            and cy >= shape[3] and cy <= shape[5] then
+            return not self:HasVisited(zone)
+        end
+    end
+    return false
+end
+
 local warned = {}
 
 --- The fully explored zones of *mapID*. Each entry is { zoneUiMapID, u0, v0,

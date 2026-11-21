@@ -1279,12 +1279,15 @@ local function DoRefresh(force)
         if explored then
             local fillPieces = 0
             for _, rect in ipairs(explored) do
-                fillPieces = fillPieces + DrawFillPiece(
-                    rect.offsetX, rect.offsetY,
-                    rect.textureWidth, rect.textureHeight,
-                    blizzardLayerW, blizzardLayerH,
-                    layerW, layerH, tilePxW, tilePxH, cols, rows, tileSource,
-                    scaleX, scaleY, gridX, gridY, filled, pieceTex, trace)
+                -- Skip Moonglade's continent-level overlay until visited (ZoneFog).
+                if not ns.ZoneFog:RectGated(mapID, rect, blizzardLayerW, blizzardLayerH) then
+                    fillPieces = fillPieces + DrawFillPiece(
+                        rect.offsetX, rect.offsetY,
+                        rect.textureWidth, rect.textureHeight,
+                        blizzardLayerW, blizzardLayerH,
+                        layerW, layerH, tilePxW, tilePxH, cols, rows, tileSource,
+                        scaleX, scaleY, gridX, gridY, filled, pieceTex, trace)
+                end
             end
             fogPiecesDrawn = fogPiecesDrawn + fillPieces
             if trace then
