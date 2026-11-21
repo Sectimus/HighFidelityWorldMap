@@ -46,6 +46,7 @@ end
 --- PLAYER_LOGIN used to mark.
 function addon:OnEnable()
     self:RegisterEvent("PLAYER_ENTERING_WORLD")
+    self:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 
     self:RegisterEvent("MAP_EXPLORATION_UPDATED")
 
@@ -176,6 +177,18 @@ end
 --- blocks SetPassThroughButtons (ADDON_ACTION_BLOCKED, issue #20).
 function addon:PLAYER_ENTERING_WORLD()
     Renderer:Preload()
+    self:RecordCurrentZone()
+end
+
+--- Moving between zones inside a continent fires this, not PLAYER_ENTERING_WORLD.
+function addon:ZONE_CHANGED_NEW_AREA()
+    self:RecordCurrentZone()
+end
+
+--- Note the player's zone for ZoneFog's visit gating (Moonglade).
+function addon:RecordCurrentZone()
+    local mapID = C_Map.GetBestMapForUnit("player")
+    if mapID then ns.ZoneFog:RecordVisit(mapID) end
 end
 
 --- Fog of War's own reveal (Renderer's DrawExploredPiece) needs to hear

@@ -25,12 +25,19 @@ local forced = {}
 --- Debug override from /hfwm debug fog show (no zone): every zone explored, this session.
 local forcedAll = false
 
+--- Moonglade's single exploration overlay is also filled by continent-level
+--- exploration, so on its own it says nothing about the player having been
+--- there. Count it as explored only once the player has stood in it (see
+--- RecordVisit). Keyed by UiMapID; add other zones here if they need it.
+local VISIT_GATED = { [1450] = true }
+
 --- Has the player explored every overlay of this zone?
 local function fullyExplored(zoneID)
     if forced[zoneID] ~= nil then return forced[zoneID] end
     if forcedAll then return true end
     local want = OVERLAYS[zoneID]
     if not want then return false end
+    if VISIT_GATED[zoneID] and not ZoneFog:HasVisited(zoneID) then return false end
     local seen, n = {}, 0
     for _, t in ipairs(C_MapExplorationInfo.GetExploredMapTextures(zoneID) or {}) do
         local key = t.offsetX .. "," .. t.offsetY .. ","
@@ -41,6 +48,23 @@ local function fullyExplored(zoneID)
         end
     end
     return n >= want
+end
+
+--- Has this character ever been inside *zoneID*? Persisted per character in
+--- HighFidelityWorldMapDB.visited, so it survives sessions and does not
+--- depend on when HFWM was installed. Only zones in VISIT_GATED are asked.
+function ZoneFog:HasVisited(zoneID)
+    local db = ns.Config.dbObj and ns.Config.dbObj.char
+    return db and db.visited and db.visited[zoneID] == true or false
+end
+
+--- Record that the player is inside *zoneID*. Called on login and zone change.
+function ZoneFog:RecordVisit(zoneID)
+    if not VISIT_GATED[zoneID] then return end
+    local db = ns.Config.dbObj and ns.Config.dbObj.char
+    if not db then return end
+    db.visited = db.visited or {}
+    db.visited[zoneID] = true
 end
 
 local warned = {}
