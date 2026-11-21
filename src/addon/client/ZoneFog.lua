@@ -50,12 +50,28 @@ local function fullyExplored(zoneID)
     return n >= want
 end
 
---- Has this character ever been inside *zoneID*? Persisted per character in
---- HighFidelityWorldMapDB.visited, so it survives sessions and does not
---- depend on when HFWM was installed. Only zones in VISIT_GATED are asked.
+--- Has this character been to *zoneID*? Two signals, either one is enough:
+---  1. Flight points: C_TaxiMap.GetTaxiNodesForMap reports isUndiscovered per
+---     node, and a node is only discovered by visiting the area. This is
+---     per-character game state, so it also covers visits made before HFWM
+---     was installed.
+---  2. The visit flag HFWM records itself (RecordVisit), a fallback for when
+---     the taxi data is unavailable or the zone has no flight point.
 function ZoneFog:HasVisited(zoneID)
+    if self:HasDiscoveredTaxiNode(zoneID) then return true end
     local db = ns.Config.dbObj and ns.Config.dbObj.char
     return db and db.visited and db.visited[zoneID] == true or false
+end
+
+--- True when *zoneID* has a flight point this character has discovered.
+function ZoneFog:HasDiscoveredTaxiNode(zoneID)
+    if not (C_TaxiMap and C_TaxiMap.GetTaxiNodesForMap) then return false end
+    local ok, nodes = pcall(C_TaxiMap.GetTaxiNodesForMap, zoneID)
+    if not ok or type(nodes) ~= "table" then return false end
+    for _, node in ipairs(nodes) do
+        if node.isUndiscovered == false then return true end
+    end
+    return false
 end
 
 --- Record that the player is inside *zoneID*. Called on login and zone change.
