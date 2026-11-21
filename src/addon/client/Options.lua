@@ -87,11 +87,11 @@ end
 --- map state is on. HD is 1.0, SD is 0.0. Writing goes through
 --- ToggleButton:SetBlendForKey, so the overlay and labels update as the button
 --- does.
-local function StateDropdown(order, mapKey, label)
+local function StateDropdown(order, mapKey, label, prefix)
     local function SlotKey()
         if not Config.db.rememberAlphaPerMapType then return "all" end
-        if not Config.db.rememberAlphaPerMapState then return mapKey end
-        return (Config:IsWorldMapMaximised() and "full" or "windowed") .. ":" .. mapKey
+        if not Config.db.rememberAlphaPerMapState or not prefix then return mapKey end
+        return prefix .. ":" .. mapKey
     end
     return {
         order = order,
@@ -999,7 +999,6 @@ local options = {
                     name = "Persist map state",
                     desc = "Remember the HD/SD state independantly for the "
                         .. "fullscreen/windowed versions of the world map pane",
-                    hidden = function() return not Config.db.toggleButtonEnabled end,
                     get = function() return Config.db.rememberAlphaPerMapState end,
                     set = function(_, value)
                         Config.db.rememberAlphaPerMapState = value
@@ -1012,12 +1011,38 @@ local options = {
                     type = "group",
                     inline = true,
                     name = "States:",
-                    hidden = function() return Config.db.toggleButtonEnabled end,
+                    hidden = function() return Config.db.toggleButtonEnabled or Config.db.rememberAlphaPerMapState end,
                     args = {
                         stateZone = StateDropdown(1, "zone", "Zone Map"),
                         stateContinent = StateDropdown(2, "continent", "Continent Map"),
                         stateWorld = StateDropdown(3, "world", "World Map"),
                         stateCity = StateDropdown(4, "city", "City Map"),
+                    },
+                },
+                windowedStates = {
+                    order = 30,
+                    type = "group",
+                    inline = true,
+                    name = "Windowed States",
+                    hidden = function() return Config.db.toggleButtonEnabled or not Config.db.rememberAlphaPerMapState end,
+                    args = {
+                        stateZone = StateDropdown(1, "zone", "Zone Map", "windowed"),
+                        stateContinent = StateDropdown(2, "continent", "Continent Map", "windowed"),
+                        stateWorld = StateDropdown(3, "world", "World Map", "windowed"),
+                        stateCity = StateDropdown(4, "city", "City Map", "windowed"),
+                    },
+                },
+                fullscreenStates = {
+                    order = 31,
+                    type = "group",
+                    inline = true,
+                    name = "Fullscreen States",
+                    hidden = function() return Config.db.toggleButtonEnabled or not Config.db.rememberAlphaPerMapState end,
+                    args = {
+                        stateZone = StateDropdown(1, "zone", "Zone Map", "full"),
+                        stateContinent = StateDropdown(2, "continent", "Continent Map", "full"),
+                        stateWorld = StateDropdown(3, "world", "World Map", "full"),
+                        stateCity = StateDropdown(4, "city", "City Map", "full"),
                     },
                 },
             },
