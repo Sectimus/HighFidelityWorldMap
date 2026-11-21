@@ -50,22 +50,23 @@ local function fullyExplored(zoneID)
     return n >= want
 end
 
+--- Moonglade's exploration achievement, earned on this character.
+local VISIT_ACHIEVEMENT = { [1450] = 855 }
+
 --- Has this character been to *zoneID*? Two signals, either one is enough:
----  1. Achievement 855 "Explore Moonglade" (per character, wasEarnedByMe). It
----     completes only after exploring the zone's whole map, so it implies a
----     visit. Covers visits made before HFWM was installed.
----  2. The visit flag HFWM records itself (RecordVisit), a fallback in case the
----     achievement lookup is unavailable.
---- The flight point (C_TaxiMap isUndiscovered) is not used: it reported Moonglade
---- discovered for characters that had never entered it.
+---  1. The zone's exploration achievement (VISIT_ACHIEVEMENT), earned on this
+---     character (wasEarnedByMe). It completes only after exploring the whole
+---     zone, so it implies a visit, including visits made before HFWM was
+---     installed.
+---  2. The visit flag HFWM records itself (RecordVisit), a fallback for when
+---     the achievement lookup is unavailable.
+--- Flight points are not used: C_TaxiMap reported Moonglade discovered for
+--- characters that had never entered it.
 function ZoneFog:HasVisited(zoneID)
     if self:HasEarnedVisitAchievement(zoneID) then return true end
     local db = ns.Config.dbObj and ns.Config.dbObj.char
     return db and db.visited and db.visited[zoneID] == true or false
 end
-
---- Moonglade's exploration achievement, earned on this character.
-local VISIT_ACHIEVEMENT = { [1450] = 855 }
 
 --- True when this character has earned the zone's exploration achievement.
 function ZoneFog:HasEarnedVisitAchievement(zoneID)
@@ -73,17 +74,6 @@ function ZoneFog:HasEarnedVisitAchievement(zoneID)
     if not id or not GetAchievementInfo then return false end
     local ok, _, _, _, _, _, _, _, _, _, _, _, wasEarnedByMe = pcall(GetAchievementInfo, id)
     return ok and wasEarnedByMe == true
-end
-
---- True when *zoneID* has a flight point this character has discovered.
-function ZoneFog:HasDiscoveredTaxiNode(zoneID)
-    if not (C_TaxiMap and C_TaxiMap.GetTaxiNodesForMap) then return false end
-    local ok, nodes = pcall(C_TaxiMap.GetTaxiNodesForMap, zoneID)
-    if not ok or type(nodes) ~= "table" then return false end
-    for _, node in ipairs(nodes) do
-        if node.isUndiscovered == false then return true end
-    end
-    return false
 end
 
 --- Record that the player is inside *zoneID*. Called on login and zone change.
