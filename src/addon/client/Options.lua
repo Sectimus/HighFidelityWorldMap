@@ -1753,6 +1753,7 @@ function Options:Init()
     local ok, err = pcall(function()
         local frame, category = RegisterClientPanel(
             AceConfigDialog, MAIN_APP, PANEL_TITLE)
+        Options.mainCategory = category
         frames[#frames + 1] = { frame, MAIN_PAGE }
         for _, page in ipairs(SUB_PAGES) do
             frame = RegisterClientPanel(
@@ -1772,6 +1773,15 @@ function Options:Init()
     registered = ok
     self.clientRegistered = ok
     for _, f in ipairs(frames) do ShowLogo(f[1], f[2]) end
+end
+
+--- Open the HFWM page in the client's Settings window. Uses the category
+--- kept at registration with Blizzard's OpenToCategory, not a panel name,
+--- so the Settings panel is not tainted (see RegisterClientPanel).
+function Options:Open()
+    local category = self.mainCategory
+    if not category or not _G.Settings or not _G.Settings.OpenToCategory then return end
+    _G.Settings.OpenToCategory(category:GetID())
 end
 
 --- Push a live setting change (from a slash command, say) out to any open
