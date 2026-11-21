@@ -86,6 +86,17 @@ local function ApplyAlpha(value)
     UpdateLabel()
 end
 
+--- Set the blend of one alphas[] slot, for the Options States dropdowns. The
+--- same work as ApplyAlpha, but written to `key` rather than the slot of the
+--- map on screen. The overlay and label only change when that slot is the
+--- one currently shown, so a dropdown for another map type does not disturb
+--- the open map.
+function ToggleButton:SetBlendForKey(key, value)
+    Config.db.alphas[key] = value
+    if key ~= Config:AlphaKey() then return end
+    ApplyAlpha(value)
+end
+
 local pinned        -- popup is detached from the map and staying open
 local unpinPopup    -- set by CreatePopup: close the popup and clear the pin
 -- How far (UI units) the mouse may stray past the popup or button before

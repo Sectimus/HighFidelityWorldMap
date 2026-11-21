@@ -80,6 +80,34 @@ local function NoAreaLabelsOn()
         or Config.db.showAreaCityDistricts or Config.db.showAreaPOIs)
 end
 
+--- One HD/SD States dropdown for a map type (*mapKey*: zone, continent, world
+--- or city). It reads and writes the same alphas[] slot the HD/SD button uses
+--- for that map type: the type's own slot when Persist map type is on, the
+--- shared `all` slot when off, and the windowed/fullscreen prefix when Persist
+--- map state is on. HD is 1.0, SD is 0.0. Writing goes through
+--- ToggleButton:SetBlendForKey, so the overlay and labels update as the button
+--- does.
+local function StateDropdown(order, mapKey, label)
+    local function SlotKey()
+        if not Config.db.rememberAlphaPerMapType then return "all" end
+        if not Config.db.rememberAlphaPerMapState then return mapKey end
+        return (Config:IsWorldMapMaximised() and "full" or "windowed") .. ":" .. mapKey
+    end
+    return {
+        order = order,
+        type = "select",
+        name = label,
+        values = { hd = "HD", sd = "SD" },
+        get = function()
+            local v = Config.db.alphas[SlotKey()] or 1.0
+            return v > 0.5 and "hd" or "sd"
+        end,
+        set = function(_, v)
+            ns.ToggleButton:SetBlendForKey(SlotKey(), v == "hd" and 1.0 or 0.0)
+        end,
+    }
+end
+
 local SECTION_RESET = "HFWM-SectionReset"  -- registered below, with the widgets
 -- The Config.db fields of each label kind: the show toggle, scale, Auto-scale
 -- and the prefix of its <color>ColorMode / Color / Color2 / GradientDir /
@@ -986,38 +1014,10 @@ local options = {
                     name = "States:",
                     hidden = function() return Config.db.toggleButtonEnabled end,
                     args = {
-                        stateZone = {
-                            order = 1,
-                            type = "select",
-                            name = "Zone Map",
-                            values = { hd = "HD", sd = "SD" },
-                            get = function() return Config.db.alphas.zone >= 0.5 and "hd" or "sd" end,
-                            set = function(_, v) Config.db.alphas.zone = v == "hd" and 1.0 or 0.0; ns.Renderer:ForceRefresh(); ns.ToggleButton:Refresh() end,
-                        },
-                        stateContinent = {
-                            order = 2,
-                            type = "select",
-                            name = "Continent Map",
-                            values = { hd = "HD", sd = "SD" },
-                            get = function() return Config.db.alphas.continent >= 0.5 and "hd" or "sd" end,
-                            set = function(_, v) Config.db.alphas.continent = v == "hd" and 1.0 or 0.0; ns.Renderer:ForceRefresh(); ns.ToggleButton:Refresh() end,
-                        },
-                        stateWorld = {
-                            order = 3,
-                            type = "select",
-                            name = "World Map",
-                            values = { hd = "HD", sd = "SD" },
-                            get = function() return Config.db.alphas.world >= 0.5 and "hd" or "sd" end,
-                            set = function(_, v) Config.db.alphas.world = v == "hd" and 1.0 or 0.0; ns.Renderer:ForceRefresh(); ns.ToggleButton:Refresh() end,
-                        },
-                        stateCity = {
-                            order = 4,
-                            type = "select",
-                            name = "City Map",
-                            values = { hd = "HD", sd = "SD" },
-                            get = function() return Config.db.alphas.city >= 0.5 and "hd" or "sd" end,
-                            set = function(_, v) Config.db.alphas.city = v == "hd" and 1.0 or 0.0; ns.Renderer:ForceRefresh(); ns.ToggleButton:Refresh() end,
-                        },
+                        stateZone = StateDropdown(1, "zone", "Zone Map"),
+                        stateContinent = StateDropdown(2, "continent", "Continent Map"),
+                        stateWorld = StateDropdown(3, "world", "World Map"),
+                        stateCity = StateDropdown(4, "city", "City Map"),
                     },
                 },
             },
