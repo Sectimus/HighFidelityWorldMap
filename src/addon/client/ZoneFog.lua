@@ -51,16 +51,28 @@ local function fullyExplored(zoneID)
 end
 
 --- Has this character been to *zoneID*? Two signals, either one is enough:
----  1. Flight points: C_TaxiMap.GetTaxiNodesForMap reports isUndiscovered per
----     node, and a node is only discovered by visiting the area. This is
----     per-character game state, so it also covers visits made before HFWM
----     was installed.
----  2. The visit flag HFWM records itself (RecordVisit), a fallback for when
----     the taxi data is unavailable or the zone has no flight point.
+---  1. Achievement 855 "Explore Moonglade" (per character, wasEarnedByMe). It
+---     completes only after exploring the zone's whole map, so it implies a
+---     visit. Covers visits made before HFWM was installed.
+---  2. The visit flag HFWM records itself (RecordVisit), a fallback in case the
+---     achievement lookup is unavailable.
+--- The flight point (C_TaxiMap isUndiscovered) is not used: it reported Moonglade
+--- discovered for characters that had never entered it.
 function ZoneFog:HasVisited(zoneID)
-    if self:HasDiscoveredTaxiNode(zoneID) then return true end
+    if self:HasEarnedVisitAchievement(zoneID) then return true end
     local db = ns.Config.dbObj and ns.Config.dbObj.char
     return db and db.visited and db.visited[zoneID] == true or false
+end
+
+--- Moonglade's exploration achievement, earned on this character.
+local VISIT_ACHIEVEMENT = { [1450] = 855 }
+
+--- True when this character has earned the zone's exploration achievement.
+function ZoneFog:HasEarnedVisitAchievement(zoneID)
+    local id = VISIT_ACHIEVEMENT[zoneID]
+    if not id or not GetAchievementInfo then return false end
+    local ok, _, _, _, _, _, _, _, _, _, _, _, wasEarnedByMe = pcall(GetAchievementInfo, id)
+    return ok and wasEarnedByMe == true
 end
 
 --- True when *zoneID* has a flight point this character has discovered.
