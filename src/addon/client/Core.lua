@@ -3,6 +3,7 @@
 -- Wires up events and hooks once Ace3 initializes the addon.
 --
 -- /hfwm             - open settings
+-- /hfwm toggle      - switch the HD/SD overlay on / off
 -- /hfwm on|off      - explicit enable / disable
 -- /hfwm bg NAME     - map background: default | ocean | hybrid
 -- /hfwm cave        - the cave map window (on|off|show|hide|reset|alpha N|indoors)
