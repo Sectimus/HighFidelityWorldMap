@@ -953,7 +953,7 @@ local options = {
                 rememberAlphaPerMapType = {
                     order = 20,
                     type = "toggle",
-                    name = "Remember per map type",
+                    name = "Persist map type",
                     desc = "Remember the HD/SD state based upon map types (So it is "
                         .. "possible to keep the Zone level view at HD meanwhile "
                         .. "continent level is at SD etc.)",
@@ -968,7 +968,7 @@ local options = {
                 rememberAlphaPerMapState = {
                     order = 21,
                     type = "toggle",
-                    name = "Remember per map state",
+                    name = "Persist map state",
                     desc = "Remember the HD/SD state independantly for the "
                         .. "fullscreen/windowed versions of the world map pane",
                     disabled = function() return not Config.db.toggleButtonEnabled end,
