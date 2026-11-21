@@ -831,6 +831,20 @@ local options = {
                 ns.AreaLabels:Refresh()
             end,
         },
+        rememberAlphaPerMapType = {
+            order = 41,
+            type = "toggle",
+            name = "Remember per map type",
+            desc = "Remember the HD/SD state based upon map types (So it is "
+                .. "possible to keep the Zone level view at HD meanwhile "
+                .. "continent level is at SD etc.)",
+            get = function() return Config.db.rememberAlphaPerMapType end,
+            set = function(_, value)
+                Config.db.rememberAlphaPerMapType = value
+                ns.Renderer:ForceRefresh()
+                ns.ToggleButton:Refresh()
+            end,
+        },
         rememberMapZoomPan = {
             order = 40,
             type = "toggle",

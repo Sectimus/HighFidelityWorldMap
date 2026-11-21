@@ -8,8 +8,10 @@ local Config = ns.Config
 -- Defaults (persisted per-profile in HighFidelityWorldMapDB)
 Config.DEFAULTS = {
     enabled       = true,
-    -- HD/SD blend (ToggleButton's slider), remembered per map type.
-    alphas        = { zone = 1.0, continent = 1.0, world = 1.0, city = 1.0 },
+    -- HD/SD blend (ToggleButton's slider). Remembered per map type while
+    -- rememberAlphaPerMapType is on; otherwise every map type shares `all`.
+    alphas        = { zone = 1.0, continent = 1.0, world = 1.0, city = 1.0, all = 1.0 },
+    rememberAlphaPerMapType = true,
     mapBackground = "hybrid",  -- see Config.BACKGROUNDS below
 
     -- Per-map-type overrides of mapBackground above (now labelled "Global
@@ -938,14 +940,20 @@ end
 --- (caves, dungeons) share the zone value.
 ---@return number
 function Config:GetAlpha()
-    local mapType = self:ClassifyMapID(WorldMapFrame:GetMapID()) or "zone"
-    return self.db.alphas[mapType]
+    return self.db.alphas[self:AlphaKey()]
 end
 
 ---@param value number
 function Config:SetAlpha(value)
-    local mapType = self:ClassifyMapID(WorldMapFrame:GetMapID()) or "zone"
-    self.db.alphas[mapType] = value
+    self.db.alphas[self:AlphaKey()] = value
+end
+
+--- The alphas[] slot the current blend lives in: the map's own type when
+--- "Remember per map type" is on, otherwise the single shared `all` slot.
+---@return string
+function Config:AlphaKey()
+    if not self.db.rememberAlphaPerMapType then return "all" end
+    return self:ClassifyMapID(WorldMapFrame:GetMapID()) or "zone"
 end
 
 -- Vashj'ir UiMapIDs -- retail-only (Cataclysm). WoW Forever has no
