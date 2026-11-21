@@ -831,33 +831,6 @@ local options = {
                 ns.AreaLabels:Refresh()
             end,
         },
-        rememberAlphaPerMapType = {
-            order = 41,
-            type = "toggle",
-            name = "Remember per map type",
-            desc = "Remember the HD/SD state based upon map types (So it is "
-                .. "possible to keep the Zone level view at HD meanwhile "
-                .. "continent level is at SD etc.)",
-            get = function() return Config.db.rememberAlphaPerMapType end,
-            set = function(_, value)
-                Config.db.rememberAlphaPerMapType = value
-                ns.Renderer:ForceRefresh()
-                ns.ToggleButton:Refresh()
-            end,
-        },
-        rememberAlphaPerMapState = {
-            order = 42,
-            type = "toggle",
-            name = "Remember per map state",
-            desc = "Remember the HD/SD state independantly for the "
-                .. "fullscreen/windowed versions of the world map pane",
-            get = function() return Config.db.rememberAlphaPerMapState end,
-            set = function(_, value)
-                Config.db.rememberAlphaPerMapState = value
-                ns.Renderer:ForceRefresh()
-                ns.ToggleButton:Refresh()
-            end,
-        },
         rememberMapZoomPan = {
             order = 40,
             type = "toggle",
@@ -943,33 +916,70 @@ local options = {
             end,
         },
 
-        toggleButtonEnabled = {
+        hdSdToggle = {
             order = 72,
-            type = "toggle",
+            type = "group",
+            inline = true,
             name = "HD/SD Toggle",
-            desc = "Adds a small red button to the top-right corner of the "
-                .. "world map pane to switch between hfwm and vanilla map "
-                .. "tiles",
-            get = function() return Config.db.toggleButtonEnabled end,
-            set = function(_, value)
-                Config.db.toggleButtonEnabled = value
-                ns.ToggleButton:Refresh()
-            end,
-        },
-        toggleButtonMovable = {
-            order = 73,
-            type = "toggle",
-            name = "Moveable toggle",
-            desc = "Lets you click and drag the HD/SD button to another "
-                .. "spot on the world map, for when another addon uses "
-                .. "the same corner. It stays inside the map, and its "
-                .. "position is remembered even if this is turned off. "
-                .. "Reset to defaults puts it back.",
-            disabled = function() return not Config.db.toggleButtonEnabled end,
-            get = function() return Config.db.toggleButtonMovable end,
-            set = function(_, value)
-                Config.db.toggleButtonMovable = value
-            end,
+            args = {
+                toggleButtonEnabled = {
+                    order = 10,
+                    type = "toggle",
+                    name = "Enabled",
+                    desc = "Adds a small red button to the top-right corner of the "
+                        .. "world map pane to switch between hfwm and vanilla map "
+                        .. "tiles",
+                    get = function() return Config.db.toggleButtonEnabled end,
+                    set = function(_, value)
+                        Config.db.toggleButtonEnabled = value
+                        ns.ToggleButton:Refresh()
+                    end,
+                },
+                toggleButtonMovable = {
+                    order = 11,
+                    type = "toggle",
+                    name = "Moveable toggle",
+                    desc = "Lets you click and drag the HD/SD button to another "
+                        .. "spot on the world map, for when another addon uses "
+                        .. "the same corner. It stays inside the map, and its "
+                        .. "position is remembered even if this is turned off. "
+                        .. "Reset to defaults puts it back.",
+                    disabled = function() return not Config.db.toggleButtonEnabled end,
+                    get = function() return Config.db.toggleButtonMovable end,
+                    set = function(_, value)
+                        Config.db.toggleButtonMovable = value
+                    end,
+                },
+                rememberAlphaPerMapType = {
+                    order = 20,
+                    type = "toggle",
+                    name = "Remember per map type",
+                    desc = "Remember the HD/SD state based upon map types (So it is "
+                        .. "possible to keep the Zone level view at HD meanwhile "
+                        .. "continent level is at SD etc.)",
+                    disabled = function() return not Config.db.toggleButtonEnabled end,
+                    get = function() return Config.db.rememberAlphaPerMapType end,
+                    set = function(_, value)
+                        Config.db.rememberAlphaPerMapType = value
+                        ns.Renderer:ForceRefresh()
+                        ns.ToggleButton:Refresh()
+                    end,
+                },
+                rememberAlphaPerMapState = {
+                    order = 21,
+                    type = "toggle",
+                    name = "Remember per map state",
+                    desc = "Remember the HD/SD state independantly for the "
+                        .. "fullscreen/windowed versions of the world map pane",
+                    disabled = function() return not Config.db.toggleButtonEnabled end,
+                    get = function() return Config.db.rememberAlphaPerMapState end,
+                    set = function(_, value)
+                        Config.db.rememberAlphaPerMapState = value
+                        ns.Renderer:ForceRefresh()
+                        ns.ToggleButton:Refresh()
+                    end,
+                },
+            },
         },
         mapBackground = {
             order = 75,
