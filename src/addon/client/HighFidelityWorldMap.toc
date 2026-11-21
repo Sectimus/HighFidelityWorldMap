@@ -59,7 +59,6 @@ MapMemory.lua
 ZoomLevels.lua
 ResetView.lua
 KeepCentered.lua
-Integrations.lua
 ToggleButton.lua
 Coords.lua
 CustomLabels.lua

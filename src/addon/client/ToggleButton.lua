@@ -31,7 +31,6 @@ local addonName, ns = ...
 local Config       = ns.Config
 local Renderer     = ns.Renderer
 local ToggleButton = ns.ToggleButton
-local Integrations = ns.Integrations
 
 local WorldMapFrame = _G.WorldMapFrame
 
@@ -236,10 +235,25 @@ local function Toggle()
     if syncPopup and popup and popup:IsShown() then syncPopup() end
 end
 
---- Where the button sits when not moved: the map pane's top-right corner.
+--- The map's tracking options button (WorldMapFrame.WorldMapTrackingOptionsButton,
+--- confirmed with /fstack). The HD/SD toggle docks under it.
+local function FindMapFilterButton()
+    local f = WorldMapFrame and WorldMapFrame.WorldMapTrackingOptionsButton
+    if f and f.GetBottom then return f end
+    return nil
+end
+
+--- Where the button sits when not moved: centred 10px below the map's filter
+--- options button (its TOP to that button's BOTTOM). If that button can't be
+--- found, fall back to the map pane's top-right corner.
 local function PlaceDefault()
     button:ClearAllPoints()
-    button:SetPoint("TOPRIGHT", WorldMapFrame.ScrollContainer or WorldMapFrame, "TOPRIGHT", -2, 2)
+    local filter = FindMapFilterButton()
+    if filter then
+        button:SetPoint("TOP", filter, "BOTTOM", 0, -10)
+    else
+        button:SetPoint("TOPRIGHT", WorldMapFrame.ScrollContainer or WorldMapFrame, "TOPRIGHT", -2, 2)
+    end
 end
 
 --- Clamp a TOPRIGHT offset (button-scale units) so every edge of the button
@@ -256,8 +270,7 @@ end
 
 --- Put the button where the profile remembers it (Config.db.toggleButtonPoint,
 --- { x, y } from the pane's TOPRIGHT; absent = default spot). Applies even
---- with "Moveable toggle" off: that only gates dragging. Then lets other
---- addons' map buttons make room for it (Integrations).
+--- with "Moveable toggle" off: that only gates dragging.
 local function ApplyPosition()
     if not button then return end
     local p = Config.db and Config.db.toggleButtonPoint
@@ -268,7 +281,6 @@ local function ApplyPosition()
         button:ClearAllPoints()
         button:SetPoint("TOPRIGHT", WorldMapFrame.ScrollContainer or WorldMapFrame, "TOPRIGHT", x, y)
     end
-    Integrations:FitAroundToggle(button)
 end
 
 local dragging, dragEnd
@@ -506,7 +518,6 @@ function ToggleButton:Refresh()
     elseif button then
         if pinned then unpinPopup() end
         button:Hide()
-        Integrations:FitAroundToggle(button)
     end
     UpdateLabel()
     SyncPad()
