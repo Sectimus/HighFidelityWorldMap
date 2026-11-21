@@ -964,7 +964,7 @@ local options = {
                     end,
                 },
                 toggleButtonMovable = {
-                    order = 11,
+                    order = 40,
                     type = "toggle",
                     name = "Moveable toggle",
                     desc = "Lets you click and drag the HD/SD button to another "
@@ -994,7 +994,7 @@ local options = {
                     end,
                 },
                 rememberAlphaPerMapState = {
-                    order = 21,
+                    order = 11,
                     type = "toggle",
                     name = "Persist map state",
                     desc = "Remember the HD/SD state independantly for the "
