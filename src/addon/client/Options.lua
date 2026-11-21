@@ -89,9 +89,11 @@ end
 --- does.
 local function StateDropdown(order, mapKey, label, prefix)
     local function SlotKey()
-        if not Config.db.rememberAlphaPerMapType then return "all" end
-        if not Config.db.rememberAlphaPerMapState or not prefix then return mapKey end
-        return prefix .. ":" .. mapKey
+        local key = Config.db.rememberAlphaPerMapType and mapKey or "all"
+        if Config.db.rememberAlphaPerMapState and prefix then
+            return prefix .. ":" .. key
+        end
+        return key
     end
     return {
         order = order,

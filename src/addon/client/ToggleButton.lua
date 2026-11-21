@@ -119,7 +119,7 @@ end
 --- plain HD overlay, 0% Blizzard's own map, and anything between is an
 --- exact mix of the two: the overlay draws at that alpha over Blizzard's
 --- map, which Config:IsMixing() makes Renderer leave visible. Stored in
---- Config.db.alphas (per map type; no Options entry or chat command) and applied live,
+--- Config.db.alphas (per map type, or the shared slot; the Options States dropdowns write these too via SetBlendForKey) and applied live,
 --- with a full Refresh only when crossing 100%.
 local function CreatePopup()
     popup = CreateFrameTry("Frame", nil, button, "BackdropTemplate")
