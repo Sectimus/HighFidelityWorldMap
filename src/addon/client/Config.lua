@@ -11,7 +11,7 @@ Config.DEFAULTS = {
     -- HD/SD blend (ToggleButton's slider). Remembered per map type while
     -- rememberAlphaPerMapType is on; otherwise every map type shares `all`.
     alphas        = { zone = 1.0, continent = 1.0, world = 1.0, city = 1.0, all = 1.0 },
-    rememberAlphaPerMapType = true,
+    rememberAlphaPerMapState = false,
     mapBackground = "hybrid",  -- see Config.BACKGROUNDS below
 
     -- Per-map-type overrides of mapBackground above (now labelled "Global
@@ -940,7 +940,7 @@ end
 --- (caves, dungeons) share the zone value.
 ---@return number
 function Config:GetAlpha()
-    return self.db.alphas[self:AlphaKey()]
+    return self.db.alphas[self:AlphaKey()] or 1.0
 end
 
 ---@param value number
@@ -952,8 +952,17 @@ end
 --- "Remember per map type" is on, otherwise the single shared `all` slot.
 ---@return string
 function Config:AlphaKey()
-    if not self.db.rememberAlphaPerMapType then return "all" end
-    return self:ClassifyMapID(WorldMapFrame:GetMapID()) or "zone"
+    local mapKey = self.db.rememberAlphaPerMapType and (self:ClassifyMapID(WorldMapFrame:GetMapID()) or "zone") or "all"
+    if not self.db.rememberAlphaPerMapState then return mapKey end
+    return (self:IsWorldMapMaximised() and "full" or "windowed") .. ":" .. mapKey
+end
+
+--- Is the world map pane maximised (fullscreen)? Treated as windowed when
+--- the client does not expose IsMaximized.
+---@return boolean
+function Config:IsWorldMapMaximised()
+    if not WorldMapFrame.IsMaximized then return false end
+    return WorldMapFrame:IsMaximized() and true or false
 end
 
 -- Vashj'ir UiMapIDs -- retail-only (Cataclysm). WoW Forever has no

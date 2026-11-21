@@ -845,6 +845,19 @@ local options = {
                 ns.ToggleButton:Refresh()
             end,
         },
+        rememberAlphaPerMapState = {
+            order = 42,
+            type = "toggle",
+            name = "Remember per map state",
+            desc = "Remember the HD/SD state independantly for the "
+                .. "fullscreen/windowed versions of the world map pane",
+            get = function() return Config.db.rememberAlphaPerMapState end,
+            set = function(_, value)
+                Config.db.rememberAlphaPerMapState = value
+                ns.Renderer:ForceRefresh()
+                ns.ToggleButton:Refresh()
+            end,
+        },
         rememberMapZoomPan = {
             order = 40,
             type = "toggle",
