@@ -11,6 +11,7 @@ Config.DEFAULTS = {
     -- HD/SD blend (ToggleButton's slider). Remembered per map type while
     -- rememberAlphaPerMapType is on; otherwise every map type shares `all`.
     alphas        = { zone = 1.0, continent = 1.0, world = 1.0, city = 1.0, all = 1.0 },
+    rememberAlphaPerMapType = true,
     rememberAlphaPerMapState = false,
     mapBackground = "hybrid",  -- see Config.BACKGROUNDS below
 
