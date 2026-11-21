@@ -508,6 +508,7 @@ function Commands:Handle(msg)
         return
     elseif cmd == "" then
         ns.Options:Open()
+        return
     elseif cmd == "toggle" then
         db.enabled = not db.enabled
     else
