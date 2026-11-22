@@ -1647,3 +1647,74 @@ function Renderer:Preload()
             mapID, #tiles, #masks))
     end
 end
+
+-- One-time, session-wide warm-up of every HD map tile: each zone's minimap
+-- placements, the underground capitals' canvases, and (when the Art addon is
+-- installed) the continent and world HD grids. Queued once and fed to the
+-- client in small batches, so login does not stall. The textures stay shown
+-- (1px, near-invisible) so the client keeps every file resident and the first
+-- open of any area is as fast as a repeat.
+local PREWARM_PER_TICK = 150
+local prewarmStarted = false
+
+function Renderer:PrewarmAll()
+    if prewarmStarted then return end
+    if not (Config.db and Config.db.enabled) then return end
+    prewarmStarted = true
+
+    local seen, list = {}, {}
+    local function add(src)
+        if src and not seen[src] then
+            seen[src] = true
+            list[#list + 1] = src
+        end
+    end
+
+    for _, tbl in ipairs({ Config.MINIMAP_ZONES, Config.SUB_MAPS }) do
+        for _, zone in pairs(tbl) do
+            for _, reg in ipairs(zone.regions or {}) do
+                for _, fdid in ipairs(reg.f or {}) do
+                    if fdid ~= 0 then add(fdid) end
+                end
+            end
+            if zone.submap then add(zone.submap.fdid) end
+        end
+    end
+
+    if Config:IsArtInstalled() then
+        local bg = Config:GetBackground()
+        local t = (bg and bg.tiles == "original")
+            and Config.NATIVE_ZONES_ORIGINAL or Config.NATIVE_ZONES
+        for _, zone in pairs(t) do
+            for i = 1, zone.cols * zone.rows do
+                add(Config.HD_BASE .. zone.path .. i)
+            end
+        end
+    end
+
+    local holder = CreateFrame("Frame", nil, UIParent)
+    holder:SetSize(1, 1)
+    holder:SetPoint("BOTTOMLEFT")
+    holder:SetFrameStrata("BACKGROUND")
+    holder:SetAlpha(0.05)
+    holder:Show()
+
+    local idx = 1
+    local function pump()
+        local stop = math.min(idx + PREWARM_PER_TICK - 1, #list)
+        for i = idx, stop do
+            local tex = holder:CreateTexture(nil, "BACKGROUND")
+            tex:SetSize(1, 1)
+            tex:SetPoint("BOTTOMLEFT")
+            tex:SetTexture(list[i])
+            tex:Show()
+        end
+        idx = stop + 1
+        if idx <= #list then
+            C_Timer.After(0.05, pump)
+        elseif Config.tracing then
+            P(("prewarm: %d HD tile(s) queued"):format(#list))
+        end
+    end
+    pump()
+end

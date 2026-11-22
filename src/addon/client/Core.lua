@@ -180,6 +180,7 @@ end
 --- blocks SetPassThroughButtons (ADDON_ACTION_BLOCKED, issue #20).
 function addon:PLAYER_ENTERING_WORLD()
     Renderer:Preload()
+    Renderer:PrewarmAll()
     self:RecordCurrentZone()
 end
 
