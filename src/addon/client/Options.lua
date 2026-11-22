@@ -1366,7 +1366,7 @@ for _, mapType in ipairs(Config.MAP_TYPES) do
 end
 mapBackgroundArgs.fogOfWarEnabled = {
     order = MAP_TYPE_ORDER.zone + 1,
-    type = "toggle",
+    type = "select",
     width = "relative",
     relWidth = 0.3,
     name = "Fog of War",
@@ -1375,10 +1375,11 @@ mapBackgroundArgs.fogOfWarEnabled = {
     -- Map is Hybrid again, because Config:FogOfWarEnabled() checks the
     -- background too.
     disabled = NotHybrid("zone"),
-    dialogControl = FOG_CHECKBOX,
-    get = function() return Config.db.fogOfWarEnabled end,
+    values = { off = "Disabled", on = "Enabled" },
+    sorting = { "off", "on" },
+    get = function() return Config.db.fogOfWarEnabled and "on" or "off" end,
     set = function(_, value)
-        Config.db.fogOfWarEnabled = value
+        Config.db.fogOfWarEnabled = (value == "on")
         ns.Renderer:ForceRefresh()
     end,
 }
@@ -1388,7 +1389,7 @@ mapBackgroundArgs.fogOfWarEnabled = {
 -- "low" is false (high is the default, when the Art addon is present).
 local function ResolutionOption(mapTypeKey, dbKey, what)
     return {
-        order = MAP_TYPE_ORDER[mapTypeKey] + 1,
+        order = MAP_TYPE_ORDER[mapTypeKey] + 0.9,
         type = "select",
         width = "relative",
         relWidth = 0.32,
@@ -1416,37 +1417,39 @@ mapBackgroundArgs.continentMapClarity =
 -- World Map's own background and its own saved value;
 -- Config:WorldFogOfWarEnabled() enforces the rule in code, and a saved "on"
 -- picks back up when it holds.
-mapBackgroundArgs.worldFogOfWar = {
-    order = MAP_TYPE_ORDER.world + 0.5,
-    type = "toggle",
-    width = "relative",
-    relWidth = 0.3,
-    name = "Fog of War",
-    desc = FogDesc(FOG_WORLD_DESC, "world"),
-    disabled = NotHybrid("world"),
-    dialogControl = FOG_CHECKBOX,
-    get = function() return Config.db.worldFogOfWar end,
-    set = function(_, value)
-        Config.db.worldFogOfWar = value
-        ns.Renderer:ForceRefresh()
-    end,
+local FOG_MODE_VALUES = {
+    off = "Disabled",
+    areas = "Enabled: Areas Found",
+    achievement = "Enabled: Legacy Achievement",
 }
--- Continent Map's own Fog of War, same rule, separate saved value.
-mapBackgroundArgs.continentFogOfWar = {
-    order = MAP_TYPE_ORDER.continent + 0.5,
-    type = "toggle",
-    width = "relative",
-    relWidth = 0.3,
-    name = "Fog of War",
-    desc = FogDesc(FOG_CONTINENT_DESC, "continent"),
-    disabled = NotHybrid("continent"),
-    dialogControl = FOG_CHECKBOX,
-    get = function() return Config.db.continentFogOfWar end,
-    set = function(_, value)
-        Config.db.continentFogOfWar = value
-        ns.Renderer:ForceRefresh()
-    end,
-}
+local FOG_MODE_SORTING = { "off", "areas", "achievement" }
+local function FogModeOption(mapTypeKey, dbKey, order, what)
+    return {
+        order = order,
+        type = "select",
+        width = "relative",
+        relWidth = 0.3,
+        name = "Fog of War",
+        desc = function()
+            return FogDesc(what, mapTypeKey)() .. "\n\nAreas Found: a zone is "
+                .. "explored when every area in it has been discovered. Legacy "
+                .. "Achievement: a zone is explored when you have earned its "
+                .. "Explore achievement."
+        end,
+        disabled = NotHybrid(mapTypeKey),
+        values = FOG_MODE_VALUES,
+        sorting = FOG_MODE_SORTING,
+        get = function() return Config.db[dbKey] or "achievement" end,
+        set = function(_, value)
+            Config.db[dbKey] = value
+            ns.Renderer:ForceRefresh()
+        end,
+    }
+end
+mapBackgroundArgs.worldFogOfWar =
+    FogModeOption("world", "worldFogOfWar", MAP_TYPE_ORDER.world + 0.5, FOG_WORLD_DESC)
+mapBackgroundArgs.continentFogOfWar =
+    FogModeOption("continent", "continentFogOfWar", MAP_TYPE_ORDER.continent + 0.5, FOG_CONTINENT_DESC)
 -- Pads the Zone row (0.32 + 0.3 + 0.3) like the other rows' two selects.
 mapBackgroundArgs.fogFill = {
     order = MAP_TYPE_ORDER.zone + 2,
