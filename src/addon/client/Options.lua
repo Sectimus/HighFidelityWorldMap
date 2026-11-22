@@ -1008,6 +1008,18 @@ local options = {
                         ns.ToggleButton:Refresh()
                     end,
                 },
+                invertHdSdButtons = {
+                    order = 50,
+                    type = "toggle",
+                    name = "Invert HD/SD buttons",
+                    desc = "Inverts the HD/SD toggle button on the world map. It defaults to OFF",
+                    hidden = function() return not Config.db.toggleButtonEnabled end,
+                    get = function() return Config.db.invertHdSdButtons end,
+                    set = function(_, value)
+                        Config.db.invertHdSdButtons = value
+                        ns.ToggleButton:Refresh()
+                    end,
+                },
                 states = {
                     order = 30,
                     type = "group",
@@ -1685,18 +1697,6 @@ combatWatch:RegisterEvent("PLAYER_REGEN_DISABLED")
 combatWatch:RegisterEvent("PLAYER_REGEN_ENABLED")
 combatWatch:SetScript("OnEvent", function() UpdatePreview() end)
 
---- Expand or collapse an addon's top-level category in the Blizzard Settings
---- tree, so its subpages are listed or hidden. Same calls Blizzard's own
---- OpenToCategory makes: flag the category, then rebuild the list. No-op when
---- already in that state or when the Settings panel isn't loaded.
-local function SetSettingsCategoryExpanded(category, expanded)
-    local list = _G.SettingsPanel and _G.SettingsPanel:GetCategoryList()
-    local entry = list and category and list:GetCategory(category.ID)
-    if not entry or entry:IsExpanded() == expanded then return end
-    entry:SetExpanded(expanded)
-    list:CreateCategories()
-end
-
 --- AceConfigDialog:AddToBlizOptions, minus one line: on clients without
 --- C_SettingsUtil.OpenSettingsPanel (Forever) it overwrites the Blizzard
 --- category's ID with the panel name. That addon write taints the Settings
@@ -1713,11 +1713,6 @@ local function RegisterClientPanel(AceConfigDialog, appName, title, parentCatego
     group:SetUserData("appName", appName)
     group:SetCallback("OnShow", function(widget)
         AceConfigDialog:Open(appName, widget)
-        if not parentCategory then
-            C_Timer.After(0, function()
-                SetSettingsCategoryExpanded(category, true)
-            end)
-        end
         PanelShown(widget.frame)
     end)
     group:SetCallback("OnHide", function(widget)
@@ -1790,15 +1785,6 @@ function Options:Init()
                 AceConfigDialog, page.app, page.title, category)
             frames[#frames + 1] = { frame, page }
         end
-        -- Collapse the add-on's entry once the user selects any Settings page
-        -- that isn't it or one of its subpages. Deferred for the same taint
-        -- reason as the close hook above.
-        EventRegistry:RegisterCallback("Settings.CategoryChanged", function(_, selected)
-            if selected == category or selected:GetParentCategory() == category then return end
-            C_Timer.After(0, function()
-                SetSettingsCategoryExpanded(category, false)
-            end)
-        end, category)
     end)
     registered = ok
     self.clientRegistered = ok
