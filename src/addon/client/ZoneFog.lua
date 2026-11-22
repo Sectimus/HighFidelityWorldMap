@@ -3,10 +3,10 @@
 -- World/Continent "Fog of War": which zones of those maps the player has
 -- explored in full.
 --
--- A zone counts as fully explored when the number of distinct overlays
--- C_MapExplorationInfo reports for it reaches the total baked into
--- ZoneOverlays.lua (scripts/emit_zone_overlays.py). One missing patch means
--- the whole zone is not explored. All or nothing, deliberately.
+-- A zone counts as fully explored when this character has earned its
+-- "Explore <zone>" achievement (VISIT_ACHIEVEMENT). That achievement is the
+-- source of truth; the exploration overlay count (ZoneOverlays.lua) is no
+-- longer used for this.
 --
 -- Where each zone lies on Kalimdor, Eastern Kingdoms and the World map, and
 -- the mask that crops the map to its border, are built from the hand traces in
@@ -31,10 +31,9 @@ local forcedAll = false
 --- RecordVisit). Keyed by UiMapID; add other zones here if they need it.
 local VISIT_GATED = { [1450] = true }
 
---- Has the player explored every overlay of this zone?
-local function fullyExplored(zoneID)
-    if forced[zoneID] ~= nil then return forced[zoneID] end
-    if forcedAll then return true end
+--- Has the player earned this zone's exploration achievement? That alone
+--- decides whether the zone is drawn on the World/Continent maps.
+local function overlayExplored(zoneID)
     local want = OVERLAYS[zoneID]
     if not want then return false end
     if VISIT_GATED[zoneID] and not ZoneFog:HasVisited(zoneID) then return false end
@@ -50,8 +49,63 @@ local function fullyExplored(zoneID)
     return n >= want
 end
 
---- Moonglade's exploration achievement, earned on this character.
-local VISIT_ACHIEVEMENT = { [1450] = 855 }
+--- Has the player explored this zone? Forced debug state wins. Otherwise the
+--- zone's Explore achievement, or the overlay count when "Use achievement" is off.
+local function fullyExplored(zoneID, useAchievement)
+    if forced[zoneID] ~= nil then return forced[zoneID] end
+    if forcedAll then return true end
+    if useAchievement then return ZoneFog:HasEarnedVisitAchievement(zoneID) end
+    return overlayExplored(zoneID)
+end
+
+--- Exploration achievement per zone (UiMapID -> the "Explore <zone>" achievement
+--- ID, from the pinned Achievement table), for every zone on the World and
+--- Continent maps.
+local VISIT_ACHIEVEMENT = {
+    [1411] = 728,    -- Durotar
+    [1412] = 736,    -- Mulgore
+    [1413] = 750,    -- The Barrens
+    [1416] = 760,    -- Alterac Mountains
+    [1417] = 761,    -- Arathi Highlands
+    [1418] = 765,    -- Badlands
+    [1419] = 766,    -- Blasted Lands
+    [1420] = 768,    -- Tirisfal Glades
+    [1421] = 769,    -- Silverpine Forest
+    [1422] = 770,    -- Western Plaguelands
+    [1423] = 771,    -- Eastern Plaguelands
+    [1424] = 772,    -- Hillsbrad Foothills
+    [1425] = 773,    -- The Hinterlands
+    [1426] = 627,    -- Dun Morogh
+    [1427] = 774,    -- Searing Gorge
+    [1428] = 775,    -- Burning Steppes
+    [1429] = 776,    -- Elwynn Forest
+    [1430] = 777,    -- Deadwind Pass
+    [1431] = 778,    -- Duskwood
+    [1432] = 779,    -- Loch Modan
+    [1433] = 780,    -- Redridge Mountains
+    [1434] = 781,    -- Stranglethorn Vale
+    [1435] = 782,    -- Swamp of Sorrows
+    [1436] = 802,    -- Westfall
+    [1437] = 841,    -- Wetlands
+    [1438] = 842,    -- Teldrassil
+    [1439] = 844,    -- Darkshore
+    [1440] = 845,    -- Ashenvale
+    [1441] = 846,    -- Thousand Needles
+    [1442] = 847,    -- Stonetalon Mountains
+    [1443] = 848,    -- Desolace
+    [1444] = 849,    -- Feralas
+    [1445] = 850,    -- Dustwallow Marsh
+    [1446] = 851,    -- Tanaris
+    [1447] = 852,    -- Azshara
+    [1448] = 853,    -- Felwood
+    [1449] = 854,    -- Un'Goro Crater
+    [1450] = 855,    -- Moonglade
+    [1451] = 856,    -- Silithus
+    [1452] = 857,    -- Winterspring
+    [2482] = 62356,  -- Mount Hyjal
+    [2548] = 62354,  -- Riverglades
+    [2652] = 63684,  -- Shen'dralas
+}
 
 --- Has this character been to *zoneID*? Two signals, either one is enough:
 ---  1. The zone's exploration achievement (VISIT_ACHIEVEMENT), earned on this
@@ -72,7 +126,7 @@ end
 function ZoneFog:HasEarnedVisitAchievement(zoneID)
     local id = VISIT_ACHIEVEMENT[zoneID]
     if not id or not GetAchievementInfo then return false end
-    local ok, _, _, _, _, _, _, _, _, _, _, _, wasEarnedByMe = pcall(GetAchievementInfo, id)
+    local ok, _, _, _, _, _, _, _, _, _, _, _, _, wasEarnedByMe = pcall(GetAchievementInfo, id)
     return ok and wasEarnedByMe == true
 end
 
@@ -120,9 +174,17 @@ function ZoneFog:Explored(mapID)
         end
         return nil
     end
+    local db = ns.Config.db or {}
+    local mode
+    if ns.Config:ClassifyMapID(mapID) == "world" then
+        mode = db.worldFogOfWar
+    else
+        mode = db.continentFogOfWar
+    end
+    local useAchievement = mode ~= "areas"
     local zones = {}
     for _, shape in ipairs(shapes) do
-        if fullyExplored(shape[1]) then zones[#zones + 1] = shape end
+        if fullyExplored(shape[1], useAchievement) then zones[#zones + 1] = shape end
     end
     return zones
 end
