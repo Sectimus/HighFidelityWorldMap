@@ -498,6 +498,19 @@ function Commands:Handle(msg)
                 P("Every zone now treated as fully explored (this session; /reload resets).")
                 return
             end
+            if sub == "list" then
+                local mapID = WorldMapFrame:GetMapID()
+                local zones = ns.ZoneFog:Explored(mapID)
+                if not zones then
+                    P(("map %s has no zone outlines"):format(tostring(mapID)))
+                    return
+                end
+                local ids = {}
+                for _, shape in ipairs(zones) do ids[#ids + 1] = shape[1] end
+                P(("map %s explored zones (%d): %s"):format(
+                    tostring(mapID), #ids, table.concat(ids, ", ")))
+                return
+            end
             if (sub ~= "show" and sub ~= "hide") or not zone then
                 P("Usage: /hfwm debug fog show [z<UiMapID>] | hide z<UiMapID>")
                 return
