@@ -62,6 +62,14 @@ Config.DEFAULTS = {
     instanceDungeonEnabled = false,
     instanceRaidEnabled    = false,
 
+    -- Player icons: other players on the world map (see PlayerIcons.lua).
+    -- Share: send your own place, as OpenMap does. The other three toggle
+    -- which dots you see.
+    playerIconsShare   = false,
+    playerIconsFriends = true,
+    playerIconsGuild   = true,
+    playerIconsGroup   = true,
+
     -- cavePlacement: where the cave window sits by default.
     --   "outside":  beside the world map's right edge (the original behaviour)
     --   "inside":   in the map pane's top-left corner
@@ -114,15 +122,12 @@ Config.DEFAULTS = {
     -- (the default). See Renderer's Activate() and DrawExploredPiece.
     fogOfWarEnabled = true,
 
-    -- The "Fog of War" dropdowns beside the World Map and Continent Map
+    -- The "Fog of War" checkboxes beside the World Map and Continent Map
     -- dropdowns (Options), each offered under the same condition as
-    -- fogOfWarEnabled above and saved separately. Values:
-    --   "off"         no fog, the map draws as the game does
-    --   "areas"       fog over zones with any area undiscovered (overlay count)
-    --   "achievement" fog over zones whose Explore achievement is earned
-    -- See ZoneFog.lua.
-    worldFogOfWar = "achievement",
-    continentFogOfWar = "achievement",
+    -- fogOfWarEnabled above and saved separately. On: that map draws this
+    -- addon's tiles only over zones explored in full. See ZoneFog.lua.
+    worldFogOfWar = true,
+    continentFogOfWar = true,
 
     -- The "sd"/"hd" button ToggleButton.lua docks in the world map's
     -- top-right corner, for flipping the HD/SD blend (`alpha` above)
@@ -132,9 +137,6 @@ Config.DEFAULTS = {
     -- "Moveable toggle": lets the button be dragged within the map pane. Its
     -- position (db.toggleButtonPoint, below) is kept either way.
     toggleButtonMovable = true,
-    -- "Invert HD/SD buttons": the button's label names the blend it is
-    -- showing, not the one a click switches to. Off by default.
-    invertHdSdButtons = false,
 
     -- The client's own Player and Cursor coordinate readouts on the world
     -- map (Coords.lua), each toggled from Options. On by default, as the
@@ -864,9 +866,9 @@ function Config:WorldFogOfWarEnabled(mapID)
     if not self.db then return false end
     local mapType = self:ClassifyMapID(mapID)
     if mapType == "world" then
-        return self.db.worldFogOfWar ~= "off" and self:MapTypeBackgroundIsHybrid("world")
+        return self.db.worldFogOfWar == true and self:MapTypeBackgroundIsHybrid("world")
     elseif mapType == "continent" then
-        return self.db.continentFogOfWar ~= "off" and self:MapTypeBackgroundIsHybrid("continent")
+        return self.db.continentFogOfWar == true and self:MapTypeBackgroundIsHybrid("continent")
     end
     return false
 end
@@ -990,7 +992,6 @@ Config.lastCanvasH     = 0
 Config.lastMapID       = nil
 Config.lastLayerIdx    = nil
 Config.lastSubmerged   = nil
-Config.lastLayout      = nil   -- tile layout of the last refresh (Renderer; /hfwm debug picker)
 Config.tracing         = false
 
 -- Cave map runtime state (the window itself is built by CaveRenderer)

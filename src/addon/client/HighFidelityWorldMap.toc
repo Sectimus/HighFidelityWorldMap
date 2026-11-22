@@ -59,11 +59,12 @@ MapMemory.lua
 ZoomLevels.lua
 ResetView.lua
 KeepCentered.lua
+Integrations.lua
 ToggleButton.lua
 Coords.lua
-DebugPicker.lua
 CustomLabels.lua
 AreaLabels.lua
+PlayerIcons.lua
 Commands.lua
 Options.lua
 Core.lua

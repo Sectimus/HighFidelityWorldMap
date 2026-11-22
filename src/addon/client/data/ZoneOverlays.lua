@@ -2,7 +2,7 @@
 -- UiMapID -> number of exploration overlays on that zone map.
 HFWMF_ZONE_OVERLAYS = {
     [1411] = 11,  -- Durotar
-    [1412] = 15,  -- Mulgore
+    [1412] = 16,  -- Mulgore
     [1413] = 25,  -- The Barrens
     [1416] = 15,  -- Alterac Mountains
     [1417] = 16,  -- Arathi Highlands
@@ -22,7 +22,7 @@ HFWMF_ZONE_OVERLAYS = {
     [1431] = 13,  -- Duskwood
     [1432] = 11,  -- Loch Modan
     [1433] = 11,  -- Redridge Mountains
-    [1434] = 26,  -- Stranglethorn Vale
+    [1434] = 27,  -- Stranglethorn Vale
     [1435] = 11,  -- Swamp of Sorrows
     [1436] = 14,  -- Westfall
     [1437] = 15,  -- Wetlands
@@ -41,8 +41,9 @@ HFWMF_ZONE_OVERLAYS = {
     [1450] = 1,  -- Moonglade
     [1451] = 7,  -- Silithus
     [1452] = 13,  -- Winterspring
+    [1459] = 3,  -- Alterac Valley
     [2482] = 9,  -- Mount Hyjal
-    [2521] = 15,  -- Zephras Isle
-    [2548] = 13,  -- Riverglades
+    [2521] = 16,  -- Zephras Isle
+    [2548] = 14,  -- Riverglades
     [2652] = 7,  -- Shen'dralas
 }

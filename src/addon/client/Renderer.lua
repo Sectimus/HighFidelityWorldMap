@@ -94,43 +94,6 @@ local function RestoreDefaults()
     Exploration:ApplyLevels()
 end
 
---- Reveal files are cropped, not squashed. The Forever client lays each
---- reveal file into its rectangle with texcoords 0..1, so a file bigger than
---- its rectangle (a 256px file for a 151px-wide overlay) is squashed into it
---- and its alpha shape ends up the wrong size, leaving holes. Blizzard's own
---- RefreshOverlays crops instead: right edge = pixelWidth / fileWidth, file
---- sizes being powers of two (min 16, max 256). Applies to every zone whose
---- overlay files are in the baked ZoneOverlayTiles.lua.
-local overlayByFile
-
-local function PowerOfTwoAtLeast(n)
-    local s = 16
-    while s < n do s = s * 2 end
-    return s
-end
-
---- { right, bottom } texcoord for the baked overlay tile whose file is
---- *fdid*, or nil when this zone isn't cropped or the file isn't known.
-local function MaskCropTexCoord(mapID, fdid)
-    if type(fdid) ~= "number" then return nil end
-    if not overlayByFile then
-        overlayByFile = {}
-        for _, overlays in pairs(HFWMF_ZONE_OVERLAY_TILES or {}) do
-            for _, o in ipairs(overlays) do
-                local _, _, w, h, cols, fdids = unpack(o)
-                local rows = math.ceil(#fdids / cols)
-                for i, id in ipairs(fdids) do
-                    local row, col = math.floor((i - 1) / cols), (i - 1) % cols
-                    local pw = col < cols - 1 and 256 or (w % 256 ~= 0 and w % 256 or 256)
-                    local ph = row < rows - 1 and 256 or (h % 256 ~= 0 and h % 256 or 256)
-                    overlayByFile[id] = { pw / PowerOfTwoAtLeast(pw), ph / PowerOfTwoAtLeast(ph) }
-                end
-            end
-        end
-    end
-    return overlayByFile[fdid]
-end
-
 --- Fog of War: draw the slice of this addon's own tile grid that falls
 --- under one of Blizzard's own, currently-active exploration reveal
 --- textures (Exploration:EnumerateOverlayTextures), cropped to that exact
@@ -324,25 +287,9 @@ local function DrawExploredPiece(
     local mask = MaskPool:Acquire()
     mask:ClearAllPoints()
     mask:SetPoint("TOPLEFT", blizTex, "TOPLEFT")
+    mask:SetPoint("BOTTOMRIGHT", blizTex, "BOTTOMRIGHT")
     mask:SetTexture(maskFile, "CLAMP", "CLAMP")
-    local cropped = MaskCropTexCoord(WorldMapFrame:GetMapID(), maskFile)
-    local bw, bh = blizTex:GetWidth(), blizTex:GetHeight()
-    if cropped and bw and bh and bw > 0 and bh > 0 then
-        -- Don't rely on texcoords cropping a MaskTexture: size the mask to
-        -- the whole power-of-two file at the overlay's own pixel scale and
-        -- use the entire file, so the art keeps its true size.
-        mask:SetSize(bw / cropped[1], bh / cropped[2])
-        mask:SetTexCoord(0, 1, 0, 1)
-    else
-        mask:SetPoint("BOTTOMRIGHT", blizTex, "BOTTOMRIGHT")
-        mask:SetTexCoord(mulX, mulY, mllX, mllY, murX, murY, mlrX, mlrY)
-    end
-    if trace then
-        P(("    mask: file=%s blizTex=%.1fx%.1f texcoord=%.3f,%.3f %.3f,%.3f %.3f,%.3f %.3f,%.3f crop=%s"):format(
-            tostring(maskFile), blizTex:GetWidth() or 0, blizTex:GetHeight() or 0,
-            mulX, mulY, mllX, mllY, murX, murY, mlrX, mlrY,
-            cropped and ("%.3f,%.3f"):format(cropped[1], cropped[2]) or "nil"))
-    end
+    mask:SetTexCoord(mulX, mulY, mllX, mllY, murX, murY, mlrX, mlrY)
 
     local piecesDrawn, nilSrcSkipped, degenerateSkipped = 0, 0, 0
     for row = rowStart, rowEnd do
@@ -938,7 +885,6 @@ local function DoRefresh(force)
     Config.lastCanvasH   = canvasH
     Config.lastLayerIdx  = layerIdx
     Config.lastSubmerged = submerged
-    Config.lastLayout    = nil
 
     if not Config.db or not Config.db.enabled then
         if trace then P("  BAIL: disabled") end
@@ -1207,20 +1153,6 @@ local function DoRefresh(force)
         Watchdog:Start()
         return bg
     end
-
-    -- What this refresh laid out, for /hfwm debug picker (DebugPicker.lua):
-    -- the grid, tile sources and flags the textures above were built from.
-    Config.lastLayout = {
-        mapID = mapID, background = background, mapType = mapType,
-        layerIdx = layerIdx, canvasW = canvasW, canvasH = canvasH,
-        blizzardLayerW = blizzardLayerW, blizzardLayerH = blizzardLayerH,
-        layerW = layerW, layerH = layerH, tilePxW = tilePxW, tilePxH = tilePxH,
-        cols = cols, rows = rows, gridX = gridX, gridY = gridY,
-        tileSource = tileSource, fdids = fdids,
-        useBundled = useBundled, useSubmerged = useSubmerged,
-        fogOfWar = fogOfWar, fogActive = fogActive, fullyExplored = fullyExplored,
-        worldFogZones = worldFogZones, nativeZone = nativeZone, clientZone = clientZone,
-    }
 
     if canvasW == 0 or canvasH == 0 then
         Activate()

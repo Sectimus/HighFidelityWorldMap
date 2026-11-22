@@ -485,10 +485,6 @@ function Commands:Handle(msg)
         self:OpenSettingsDialog()
         return
     elseif cmd == "debug" then
-        if args[2] == "picker" then
-            ns.DebugPicker:Command(args[3])
-            return
-        end
         if args[2] == "fog" then
             local sub, arg = args[3], args[4]
             local zone = tonumber((arg or ""):match("^z?(%d+)$"))
@@ -496,19 +492,6 @@ function Commands:Handle(msg)
                 ns.ZoneFog:SetForcedAll(true)
                 ns.Renderer:ForceRefresh()
                 P("Every zone now treated as fully explored (this session; /reload resets).")
-                return
-            end
-            if sub == "list" then
-                local mapID = WorldMapFrame:GetMapID()
-                local zones = ns.ZoneFog:Explored(mapID)
-                if not zones then
-                    P(("map %s has no zone outlines"):format(tostring(mapID)))
-                    return
-                end
-                local ids = {}
-                for _, shape in ipairs(zones) do ids[#ids + 1] = shape[1] end
-                P(("map %s explored zones (%d): %s"):format(
-                    tostring(mapID), #ids, table.concat(ids, ", ")))
                 return
             end
             if (sub ~= "show" and sub ~= "hide") or not zone then
@@ -557,7 +540,6 @@ function Commands:Handle(msg)
             .. " + large only, nuke/restore)")
         print("  /hfwm debug         - diagnostic info + force refresh")
         print("  /hfwm debug fog show [z<id>] | hide z<id> - treat zone(s) fully / not explored (session)")
-        print("  /hfwm debug picker [on|off] - middle-click the world map to open a copyable report of what is drawn under that point (session)")
         print("  /hfwm testmask [off] - show live reveal texture file(s) "
             .. "raw, unmasked (diagnostic; off removes them)")
         print("  /hfwm icon          - texture/atlas info for the quest-list "

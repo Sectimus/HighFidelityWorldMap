@@ -30,7 +30,6 @@ local KeepCentered  = ns.KeepCentered
 local ToggleButton  = ns.ToggleButton
 local Coords       = ns.Coords
 local AreaLabels    = ns.AreaLabels
-local DebugPicker  = ns.DebugPicker
 local P              = ns.P
 
 -- Key Bindings entry for the cave window toggle (Bindings.xml); the same
@@ -160,11 +159,11 @@ function addon:OnEnable()
     MapMemory:Start()
     ZoomLevels:Start()
     AreaLabels:Start()
+    PlayerIcons:Start()
     KeepCentered:Start()
     ResetView:Start()
     ToggleButton:Start()
     Coords:Start()
-    DebugPicker:Start()
 
     Commands:Register()
     -- After Commands, so a Lua error while probing the client's options

@@ -1008,18 +1008,6 @@ local options = {
                         ns.ToggleButton:Refresh()
                     end,
                 },
-                invertHdSdButtons = {
-                    order = 50,
-                    type = "toggle",
-                    name = "Invert HD/SD buttons",
-                    desc = "Inverts the HD/SD toggle button on the world map. It defaults to OFF",
-                    hidden = function() return not Config.db.toggleButtonEnabled end,
-                    get = function() return Config.db.invertHdSdButtons end,
-                    set = function(_, value)
-                        Config.db.invertHdSdButtons = value
-                        ns.ToggleButton:Refresh()
-                    end,
-                },
                 states = {
                     order = 30,
                     type = "group",
@@ -1339,6 +1327,69 @@ local options = {
                 },
             },
         },
+        playerIcons = {
+            order = 86,
+            type = "group",
+            inline = true,
+            name = "Player Icons",
+            args = {
+                intro = {
+                    order = 0,
+                    type = "description",
+                    name = "Shows other players on the world map as class-coloured dots. "
+                        .. "Shares use the same feed as OpenMap, so OpenMap users see you too.\n",
+                },
+                playerIconsShare = {
+                    order = 10,
+                    type = "toggle",
+                    name = "Share where you are",
+                    desc = "Sends your place to your guild and to friends who use OpenMap or HFWM. "
+                        .. "Nothing is sent inside dungeons, raids or battlegrounds.",
+                    disabled = function() return not Config.db.enabled end,
+                    get = function() return Config.db.playerIconsShare end,
+                    set = function(_, value)
+                        Config.db.playerIconsShare = value
+                        ns.PlayerIcons:Refresh()
+                    end,
+                },
+                playerIconsGroup = {
+                    order = 20,
+                    type = "toggle",
+                    name = "Group members",
+                    desc = "Shows your party and raid members on the map.",
+                    disabled = function() return not Config.db.enabled end,
+                    get = function() return Config.db.playerIconsGroup end,
+                    set = function(_, value)
+                        Config.db.playerIconsGroup = value
+                        ns.PlayerIcons:Refresh()
+                    end,
+                },
+                playerIconsGuild = {
+                    order = 30,
+                    type = "toggle",
+                    name = "Guild members",
+                    desc = "Shows guild members who share where they are.",
+                    disabled = function() return not Config.db.enabled end,
+                    get = function() return Config.db.playerIconsGuild end,
+                    set = function(_, value)
+                        Config.db.playerIconsGuild = value
+                        ns.PlayerIcons:Refresh()
+                    end,
+                },
+                playerIconsFriends = {
+                    order = 40,
+                    type = "toggle",
+                    name = "Friends",
+                    desc = "Shows friends who share where they are.",
+                    disabled = function() return not Config.db.enabled end,
+                    get = function() return Config.db.playerIconsFriends end,
+                    set = function(_, value)
+                        Config.db.playerIconsFriends = value
+                        ns.PlayerIcons:Refresh()
+                    end,
+                },
+            },
+        },
     },
 }
 -- Zone/World/Continent Map dropdowns, one per Config.MAP_TYPES entry,
@@ -1378,7 +1429,7 @@ for _, mapType in ipairs(Config.MAP_TYPES) do
 end
 mapBackgroundArgs.fogOfWarEnabled = {
     order = MAP_TYPE_ORDER.zone + 1,
-    type = "select",
+    type = "toggle",
     width = "relative",
     relWidth = 0.3,
     name = "Fog of War",
@@ -1387,11 +1438,10 @@ mapBackgroundArgs.fogOfWarEnabled = {
     -- Map is Hybrid again, because Config:FogOfWarEnabled() checks the
     -- background too.
     disabled = NotHybrid("zone"),
-    values = { off = "Disabled", on = "Enabled" },
-    sorting = { "off", "on" },
-    get = function() return Config.db.fogOfWarEnabled and "on" or "off" end,
+    dialogControl = FOG_CHECKBOX,
+    get = function() return Config.db.fogOfWarEnabled end,
     set = function(_, value)
-        Config.db.fogOfWarEnabled = (value == "on")
+        Config.db.fogOfWarEnabled = value
         ns.Renderer:ForceRefresh()
     end,
 }
@@ -1401,7 +1451,7 @@ mapBackgroundArgs.fogOfWarEnabled = {
 -- "low" is false (high is the default, when the Art addon is present).
 local function ResolutionOption(mapTypeKey, dbKey, what)
     return {
-        order = MAP_TYPE_ORDER[mapTypeKey] + 0.9,
+        order = MAP_TYPE_ORDER[mapTypeKey] + 1,
         type = "select",
         width = "relative",
         relWidth = 0.32,
@@ -1429,39 +1479,37 @@ mapBackgroundArgs.continentMapClarity =
 -- World Map's own background and its own saved value;
 -- Config:WorldFogOfWarEnabled() enforces the rule in code, and a saved "on"
 -- picks back up when it holds.
-local FOG_MODE_VALUES = {
-    off = "Disabled",
-    areas = "Enabled: Areas Found",
-    achievement = "Enabled: Legacy Achievement",
+mapBackgroundArgs.worldFogOfWar = {
+    order = MAP_TYPE_ORDER.world + 0.5,
+    type = "toggle",
+    width = "relative",
+    relWidth = 0.3,
+    name = "Fog of War",
+    desc = FogDesc(FOG_WORLD_DESC, "world"),
+    disabled = NotHybrid("world"),
+    dialogControl = FOG_CHECKBOX,
+    get = function() return Config.db.worldFogOfWar end,
+    set = function(_, value)
+        Config.db.worldFogOfWar = value
+        ns.Renderer:ForceRefresh()
+    end,
 }
-local FOG_MODE_SORTING = { "off", "areas", "achievement" }
-local function FogModeOption(mapTypeKey, dbKey, order, what)
-    return {
-        order = order,
-        type = "select",
-        width = "relative",
-        relWidth = 0.3,
-        name = "Fog of War",
-        desc = function()
-            return FogDesc(what, mapTypeKey)() .. "\n\nAreas Found: a zone is "
-                .. "explored when every area in it has been discovered. Legacy "
-                .. "Achievement: a zone is explored when you have earned its "
-                .. "Explore achievement."
-        end,
-        disabled = NotHybrid(mapTypeKey),
-        values = FOG_MODE_VALUES,
-        sorting = FOG_MODE_SORTING,
-        get = function() return Config.db[dbKey] or "achievement" end,
-        set = function(_, value)
-            Config.db[dbKey] = value
-            ns.Renderer:ForceRefresh()
-        end,
-    }
-end
-mapBackgroundArgs.worldFogOfWar =
-    FogModeOption("world", "worldFogOfWar", MAP_TYPE_ORDER.world + 0.5, FOG_WORLD_DESC)
-mapBackgroundArgs.continentFogOfWar =
-    FogModeOption("continent", "continentFogOfWar", MAP_TYPE_ORDER.continent + 0.5, FOG_CONTINENT_DESC)
+-- Continent Map's own Fog of War, same rule, separate saved value.
+mapBackgroundArgs.continentFogOfWar = {
+    order = MAP_TYPE_ORDER.continent + 0.5,
+    type = "toggle",
+    width = "relative",
+    relWidth = 0.3,
+    name = "Fog of War",
+    desc = FogDesc(FOG_CONTINENT_DESC, "continent"),
+    disabled = NotHybrid("continent"),
+    dialogControl = FOG_CHECKBOX,
+    get = function() return Config.db.continentFogOfWar end,
+    set = function(_, value)
+        Config.db.continentFogOfWar = value
+        ns.Renderer:ForceRefresh()
+    end,
+}
 -- Pads the Zone row (0.32 + 0.3 + 0.3) like the other rows' two selects.
 mapBackgroundArgs.fogFill = {
     order = MAP_TYPE_ORDER.zone + 2,
@@ -1521,6 +1569,8 @@ local SUB_PAGES = {
                "caveAlpha", "caveWindowScale", "caveWindowPoint" } },
     { key = "instance", title = "|cffff8800!|r Instance Map",
       keys = { "instanceDungeonEnabled", "instanceRaidEnabled" } },
+    { key = "playerIcons", title = "Player Icons",
+      keys = { "playerIconsShare", "playerIconsGroup", "playerIconsGuild", "playerIconsFriends" } },
     { key = "profiles", title = "Profiles" },
 }
 for _, page in ipairs(SUB_PAGES) do page.app = addonName .. "_" .. page.key end
@@ -1697,6 +1747,18 @@ combatWatch:RegisterEvent("PLAYER_REGEN_DISABLED")
 combatWatch:RegisterEvent("PLAYER_REGEN_ENABLED")
 combatWatch:SetScript("OnEvent", function() UpdatePreview() end)
 
+--- Expand or collapse an addon's top-level category in the Blizzard Settings
+--- tree, so its subpages are listed or hidden. Same calls Blizzard's own
+--- OpenToCategory makes: flag the category, then rebuild the list. No-op when
+--- already in that state or when the Settings panel isn't loaded.
+local function SetSettingsCategoryExpanded(category, expanded)
+    local list = _G.SettingsPanel and _G.SettingsPanel:GetCategoryList()
+    local entry = list and category and list:GetCategory(category.ID)
+    if not entry or entry:IsExpanded() == expanded then return end
+    entry:SetExpanded(expanded)
+    list:CreateCategories()
+end
+
 --- AceConfigDialog:AddToBlizOptions, minus one line: on clients without
 --- C_SettingsUtil.OpenSettingsPanel (Forever) it overwrites the Blizzard
 --- category's ID with the panel name. That addon write taints the Settings
@@ -1713,6 +1775,11 @@ local function RegisterClientPanel(AceConfigDialog, appName, title, parentCatego
     group:SetUserData("appName", appName)
     group:SetCallback("OnShow", function(widget)
         AceConfigDialog:Open(appName, widget)
+        if not parentCategory then
+            C_Timer.After(0, function()
+                SetSettingsCategoryExpanded(category, true)
+            end)
+        end
         PanelShown(widget.frame)
     end)
     group:SetCallback("OnHide", function(widget)
@@ -1785,6 +1852,15 @@ function Options:Init()
                 AceConfigDialog, page.app, page.title, category)
             frames[#frames + 1] = { frame, page }
         end
+        -- Collapse the add-on's entry once the user selects any Settings page
+        -- that isn't it or one of its subpages. Deferred for the same taint
+        -- reason as the close hook above.
+        EventRegistry:RegisterCallback("Settings.CategoryChanged", function(_, selected)
+            if selected == category or selected:GetParentCategory() == category then return end
+            C_Timer.After(0, function()
+                SetSettingsCategoryExpanded(category, false)
+            end)
+        end, category)
     end)
     registered = ok
     self.clientRegistered = ok

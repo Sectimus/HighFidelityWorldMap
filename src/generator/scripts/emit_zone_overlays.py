@@ -50,11 +50,6 @@ def zone_overlays():
         geom = (int(o["OffsetX"]), int(o["OffsetY"]),
                 int(o["TextureWidth"]), int(o["TextureHeight"]))
         grid = by_overlay.get(o["ID"], {})
-        # Skip degenerate rows: a 0-size overlay with no tiles is not a
-        # real exploration overlay and the client never reports it, so
-        # counting it makes the zone's total unreachable.
-        if geom[2] <= 0 or geom[3] <= 0 or not grid:
-            continue
         cols = 1 + max((c for _, c in grid), default=-1)
         rows = 1 + max((r for r, _ in grid), default=-1)
         fdids = [grid.get((r, c), 0) for r in range(rows) for c in range(cols)]

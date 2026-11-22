@@ -34,6 +34,3 @@ assets/projects/trailer/
 assets/images/sidepanel_toggle/
 # Local omp agent/command config
 .omp/
-
-# Local agent briefing; not for commit
-AGENTS.md

@@ -343,17 +343,33 @@ function AreaLabels:Refresh()
     local labels = {}
     local all = canvas and Config.db.enabled
         and AREA_LABELS[WorldMapFrame:GetMapID() or 0]
-    -- Under Fog of War a label is shown only when its own centre lies in
-    -- explored ground, using the same point query Questie uses for its icons.
-    -- Continent names always show. Maps with no exploration overlays (cities)
-    -- are never fogged.
+    -- Under Fog of War only explored areas are labelled; continent names always
+    -- show. A label's overlay is its area's explored-texture key (see emitter).
+    -- A subzone with no overlay key cannot be checked, so it stays hidden.
     local mapID = WorldMapFrame:GetMapID() or 0
-    local fog = (Config:FogOfWarEnabled() or Config:WorldFogOfWarEnabled(mapID))
-        and (HFWMF_ZONE_OVERLAYS or {})[mapID] ~= nil
-    local function LabelExplored(kind, u, v)
-        if not fog or kind == "continent" then return true end
-        return C_MapExplorationInfo.GetExploredAreaIDsAtPosition(
-            mapID, CreateVector2D(u, v)) ~= nil
+    local fog = Config:FogOfWarEnabled() or Config:WorldFogOfWarEnabled(mapID)
+    local explored, rects
+    if fog then
+        explored, rects = {}, {}
+        for _, t in ipairs(C_MapExplorationInfo.GetExploredMapTextures(mapID) or {}) do
+            explored[t.offsetX .. "," .. t.offsetY .. ","
+                .. t.textureWidth .. "," .. t.textureHeight] = true
+            rects[#rects + 1] = t
+        end
+    end
+    -- Custom labels carry no overlay key: explored when their point lies in an
+    -- explored texture (offsets are in the 1002x668 map space). Maps with no
+    -- exploration overlays (cities) are never fogged.
+    local function CustomExplored(p)
+        if not (rects and (HFWMF_ZONE_OVERLAYS or {})[mapID]) then return true end
+        local x, y = p.u * 1002, p.v * 668
+        for _, t in ipairs(rects) do
+            if x >= t.offsetX and x <= t.offsetX + t.textureWidth
+                and y >= t.offsetY and y <= t.offsetY + t.textureHeight then
+                return true
+            end
+        end
+        return false
     end
     local custom, shadowed = {}, {}
     for _, p in ipairs(canvas and Config.db.enabled and CUSTOM_LABELS[mapID] or {}) do
@@ -361,7 +377,7 @@ function AreaLabels:Refresh()
         if p.hide then
             shadowed[p.kind .. "|" .. p.name] = true
         elseif Config.db[k.show] and (p.kind == "poi" or Config.db[k.color .. "IncludeCustom"])
-            and LabelExplored(p.kind, p.u, p.v) then
+            and (p.kind == "continent" or CustomExplored(p)) then
             custom[#custom + 1] = p
             shadowed[p.kind .. "|" .. p.name] = true
         end
@@ -370,7 +386,8 @@ function AreaLabels:Refresh()
     -- of the same name on this map. Other kinds coexist.
     for _, label in ipairs(all or {}) do
         if Config.db[KIND[label.kind].show]
-            and LabelExplored(label.kind, label.u, label.v)
+            and (not explored or (label.overlay and explored[label.overlay])
+                or (label.overlay == nil and label.kind ~= "subzone"))
             and not shadowed[label.kind .. "|" .. label.name] then
             labels[#labels + 1] = label
         end
