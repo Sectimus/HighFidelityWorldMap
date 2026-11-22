@@ -1663,10 +1663,13 @@ function Renderer:PrewarmAll()
     prewarmStarted = true
 
     local seen, list = {}, {}
-    local function add(src)
-        if src and not seen[src] then
-            seen[src] = true
-            list[#list + 1] = src
+    -- extra: the exact SetTexture varargs the real draw path uses (or nil).
+    local function add(src, extra)
+        if not src then return end
+        local key = tostring(src) .. "|" .. (extra and table.concat(extra, ",") or "")
+        if not seen[key] then
+            seen[key] = true
+            list[#list + 1] = { src, extra }
         end
     end
 
@@ -1681,16 +1684,20 @@ function Renderer:PrewarmAll()
         end
     end
 
-    -- Zone view: the exploration overlay tiles (Fog of War reveal + HD
-    -- cut-outs) and each zone's fog-of-war outline mask.
+    -- Zone view: exploration reveal tiles (drawn TRILINEAR by Exploration) and
+    -- each zone's Fog of War outline mask (drawn CLAMP by Renderer). Queued
+    -- with those exact filters, so the client loads the same resource the
+    -- first real open will use.
     for _, overlays in pairs(HFWMF_ZONE_OVERLAY_TILES or {}) do
         for _, o in ipairs(overlays) do
-            for _, fdid in ipairs(o[6]) do add(fdid) end
+            for _, fdid in ipairs(o[6]) do
+                add(fdid, { nil, nil, "TRILINEAR" })
+            end
         end
     end
     for _, shapes in pairs(HFWMF_ZONE_SHAPES or {}) do
         for _, shape in ipairs(shapes) do
-            add(Config.MASK_BASE .. "z" .. shape[1])
+            add(Config.MASK_BASE .. "z" .. shape[1], { "CLAMP", "CLAMP" })
         end
     end
 
@@ -1719,7 +1726,12 @@ function Renderer:PrewarmAll()
             local tex = holder:CreateTexture(nil, "BACKGROUND")
             tex:SetSize(1, 1)
             tex:SetPoint("BOTTOMLEFT")
-            tex:SetTexture(list[i])
+            local src, extra = list[i][1], list[i][2]
+            if extra then
+                tex:SetTexture(src, extra[1], extra[2], extra[3])
+            else
+                tex:SetTexture(src)
+            end
             tex:Show()
         end
         idx = stop + 1

@@ -87,6 +87,13 @@ function addon:OnEnable()
         Renderer:Refresh(true)
         Cave:UpdateState()
         AreaLabels:Refresh()
+        -- Second draw on the very next frame, so the zone's fog layer is
+        -- corrected before the first open is painted, not 0.2s later.
+        C_Timer.After(0, function()
+            if WorldMapFrame:IsShown() and Config.overlayActive then
+                Renderer:ForceRefresh()
+            end
+        end)
     end)
     WorldMapFrame:HookScript("OnHide", function()
         CaveRenderer:SetMapOpen(false)
