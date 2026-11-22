@@ -114,12 +114,15 @@ Config.DEFAULTS = {
     -- (the default). See Renderer's Activate() and DrawExploredPiece.
     fogOfWarEnabled = true,
 
-    -- The "Fog of War" checkboxes beside the World Map and Continent Map
+    -- The "Fog of War" dropdowns beside the World Map and Continent Map
     -- dropdowns (Options), each offered under the same condition as
-    -- fogOfWarEnabled above and saved separately. On: that map draws this
-    -- addon's tiles only over zones explored in full. See ZoneFog.lua.
-    worldFogOfWar = true,
-    continentFogOfWar = true,
+    -- fogOfWarEnabled above and saved separately. Values:
+    --   "off"         no fog, the map draws as the game does
+    --   "areas"       fog over zones with any area undiscovered (overlay count)
+    --   "achievement" fog over zones whose Explore achievement is earned
+    -- See ZoneFog.lua.
+    worldFogOfWar = "achievement",
+    continentFogOfWar = "achievement",
 
     -- The "sd"/"hd" button ToggleButton.lua docks in the world map's
     -- top-right corner, for flipping the HD/SD blend (`alpha` above)
@@ -858,9 +861,9 @@ function Config:WorldFogOfWarEnabled(mapID)
     if not self.db then return false end
     local mapType = self:ClassifyMapID(mapID)
     if mapType == "world" then
-        return self.db.worldFogOfWar == true and self:MapTypeBackgroundIsHybrid("world")
+        return self.db.worldFogOfWar ~= "off" and self:MapTypeBackgroundIsHybrid("world")
     elseif mapType == "continent" then
-        return self.db.continentFogOfWar == true and self:MapTypeBackgroundIsHybrid("continent")
+        return self.db.continentFogOfWar ~= "off" and self:MapTypeBackgroundIsHybrid("continent")
     end
     return false
 end
