@@ -1681,6 +1681,19 @@ function Renderer:PrewarmAll()
         end
     end
 
+    -- Zone view: the exploration overlay tiles (Fog of War reveal + HD
+    -- cut-outs) and each zone's fog-of-war outline mask.
+    for _, overlays in pairs(HFWMF_ZONE_OVERLAY_TILES or {}) do
+        for _, o in ipairs(overlays) do
+            for _, fdid in ipairs(o[6]) do add(fdid) end
+        end
+    end
+    for _, shapes in pairs(HFWMF_ZONE_SHAPES or {}) do
+        for _, shape in ipairs(shapes) do
+            add(Config.MASK_BASE .. "z" .. shape[1])
+        end
+    end
+
     if Config:IsArtInstalled() then
         local bg = Config:GetBackground()
         local t = (bg and bg.tiles == "original")
