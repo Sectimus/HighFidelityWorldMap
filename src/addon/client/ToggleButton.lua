@@ -58,7 +58,13 @@ end
 
 local function UpdateLabel()
     if not button then return end
-    local text = HDShowing() and "SD" or "HD"
+    local hd = HDShowing()
+    local text
+    if Config.db.invertHdSdButtons then
+        text = hd and "HD" or "SD"
+    else
+        text = hd and "SD" or "HD"
+    end
     if button.SetText then
         button:SetText(text)
     elseif button.Text then

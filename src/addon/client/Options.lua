@@ -1008,6 +1008,18 @@ local options = {
                         ns.ToggleButton:Refresh()
                     end,
                 },
+                invertHdSdButtons = {
+                    order = 50,
+                    type = "toggle",
+                    name = "Invert HD/SD buttons",
+                    desc = "Inverts the HD/SD toggle button on the world map. It defaults to OFF",
+                    hidden = function() return not Config.db.toggleButtonEnabled end,
+                    get = function() return Config.db.invertHdSdButtons end,
+                    set = function(_, value)
+                        Config.db.invertHdSdButtons = value
+                        ns.ToggleButton:Refresh()
+                    end,
+                },
                 states = {
                     order = 30,
                     type = "group",

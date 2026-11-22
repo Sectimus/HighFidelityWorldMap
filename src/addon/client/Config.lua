@@ -129,6 +129,9 @@ Config.DEFAULTS = {
     -- "Moveable toggle": lets the button be dragged within the map pane. Its
     -- position (db.toggleButtonPoint, below) is kept either way.
     toggleButtonMovable = true,
+    -- "Invert HD/SD buttons": the button's label names the blend it is
+    -- showing, not the one a click switches to. Off by default.
+    invertHdSdButtons = false,
 
     -- The client's own Player and Cursor coordinate readouts on the world
     -- map (Coords.lua), each toggled from Options. On by default, as the
