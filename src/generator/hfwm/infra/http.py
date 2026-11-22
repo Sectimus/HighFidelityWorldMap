@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import csv
 import io
+import time
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from ..config.build import USER_AGENT
@@ -15,10 +17,44 @@ def _request(url: str) -> Request:
     return Request(url, headers={"User-Agent": USER_AGENT})
 
 
+# wago.tools throttles bursts of requests (HTTP 429) and sometimes returns 5xx
+# or drops connections. Those are transient, so retry with backoff.
+RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
+RETRY_ATTEMPTS = 6
+RETRY_BASE_SECONDS = 2.0
+RETRY_MAX_SECONDS = 60.0
+
+
+def _retry_delay(attempt: int, err: HTTPError | None) -> float:
+    """Seconds to wait before retry *attempt* (0-based). Honours Retry-After."""
+    if err is not None and err.headers is not None:
+        retry_after = err.headers.get("Retry-After", "").strip()
+        if retry_after.isdigit():
+            return min(float(retry_after), RETRY_MAX_SECONDS)
+    return min(RETRY_BASE_SECONDS * (2 ** attempt), RETRY_MAX_SECONDS)
+
+
 def fetch_url(url: str, *, timeout: int = 60) -> bytes:
-    """Simple HTTP GET with User-Agent header."""
-    with urlopen(_request(url), timeout=timeout) as resp:
-        return resp.read()
+    """HTTP GET with User-Agent header, retrying transient failures.
+
+    Retries 429/5xx and network errors with exponential backoff. Other HTTP
+    errors (e.g. 404, "not on this build") raise at once: retrying cannot
+    change the answer.
+    """
+    for attempt in range(RETRY_ATTEMPTS):
+        try:
+            with urlopen(_request(url), timeout=timeout) as resp:
+                return resp.read()
+        except HTTPError as err:
+            if err.code not in RETRY_STATUSES or attempt == RETRY_ATTEMPTS - 1:
+                raise
+            delay = _retry_delay(attempt, err)
+        except (URLError, TimeoutError, ConnectionError):
+            if attempt == RETRY_ATTEMPTS - 1:
+                raise
+            delay = _retry_delay(attempt, None)
+        time.sleep(delay)
+    raise AssertionError("unreachable")
 
 
 def fetch_csv(url: str, *, timeout: int = 60) -> list[dict]:
