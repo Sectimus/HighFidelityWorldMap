@@ -82,10 +82,10 @@ local ACE_FRAME_BOTTOM_INSET_NO_STATUS = 20  -- tighter: no pane to leave room f
 local PIN_GAP = 6
 local SLIDER_COL_W = 30   -- depth slider gutter, only when there are floors
 local SLIDER_W     = 16   -- the track itself: a stock scroll bar's width
--- Clearance kept free on the right of the fitted view for the depth slider
--- (its column plus the 2px inset it sits in), so a freshly fitted cave never
--- opens underneath it.
-local SLIDER_CLEAR = SLIDER_COL_W + 2
+-- Clearance kept free on the right of the fitted view for the depth slider:
+-- its column, the 2px inset it sits in, and 50px of breathing room beyond
+-- that, so a freshly fitted cave never opens underneath it.
+local SLIDER_CLEAR = SLIDER_COL_W + 2 + 50
 -- The thumb never reaches the very ends of a vertical Slider's track (half
 -- its height is always inside it), so anything else meant to track a
 -- fraction of the track (the height-window rectangle) has to live inside the
@@ -148,7 +148,7 @@ local ZOOM_STEP = 1.25
 local ZOOM_ANCHOR_EPSILON = 1.5
 
 local PIN_TEXTURE = "Interface\\Minimap\\MinimapArrow"
-local PIN_SIZE    = 26
+local PIN_SIZE    = 40
 
 -- The world map's own corpse pin (CorpsePinTemplate): POIIcons' tombstone.
 local CORPSE_TEXTURE   = "Interface\\Minimap\\POIIcons"
@@ -226,6 +226,9 @@ local statusbg      -- aceWindow.statustext's own parent frame (the pane
 -- `heightWindowDrag` below (OnMouseDown to start, OnUpdate plus a live
 -- IsMouseButtonDown check to follow and to notice release).
 local zoomScale    = FIT_ZOOM
+-- Zoom that contains the canvas in the area left of the depth slider. Set by
+-- LayoutWindow; the "fitted view" every reset and fresh open returns to.
+local fitZoom      = FIT_ZOOM
 -- Right-hand gutter (px) the initial fit leaves clear for the depth slider;
 -- 0 when the cave has no slider. Set by LayoutWindow, read by CenterPan.
 local fitInsetR    = 0
@@ -1484,7 +1487,7 @@ end
 --- what the shift+right-click reset on the window snaps to, so both mean
 --- exactly "the view a freshly opened cave starts with".
 local function ResetViewTransform()
-    zoomScale = FIT_ZOOM
+    zoomScale = fitZoom
     CenterPan()
     contentDrag = nil
     zoomAnchorX, zoomAnchorY = nil, nil
@@ -2156,16 +2159,20 @@ local function LayoutWindow(floorMapID)
     -- it (cropping whatever overflows, behind the chrome) instead of sitting
     -- in a box inside it.
     local vw, vh = winW - 2 * DIALOG_INSET, winH - 2 * DIALOG_INSET
-    -- The art is fitted into the viewport minus the depth slider's gutter, so
-    -- the initial view starts clear of the slider. Panning or zooming can
-    -- still bring the art under it.
-    fitInsetR = hasSlider and SLIDER_CLEAR or 0
-    local fitW = vw - fitInsetR
-    local cw, ch = fitW, fitW / aspect
+    -- Canvas covers the whole viewport, as before; panning can reach all of it.
+    local cw, ch = vw, vw / aspect
     if ch < vh then
         ch = vh
         cw = vh * aspect
     end
+    -- The initial (fitted) zoom contains that canvas in the area left of the
+    -- depth slider's gutter, so the cave opens clear of the slider. Zoom and
+    -- pan afterwards are unrestricted. A view already at the fit follows the
+    -- new fit on resize.
+    local wasFit = zoomScale == fitZoom
+    fitInsetR = hasSlider and SLIDER_CLEAR or 0
+    fitZoom = math.max(MIN_ZOOM, math.min((vw - fitInsetR) / cw, vh / ch))
+    if wasFit then zoomScale = fitZoom end
     local resized = vw ~= contentW or vh ~= contentH or cw ~= canvasW or ch ~= canvasH
     contentW, contentH = vw, vh
     canvasW, canvasH = cw, ch
@@ -2181,7 +2188,7 @@ local function LayoutWindow(floorMapID)
     -- re-clamped, rather than left pointing at a now-invalid offset.
     if canvasScale then
         canvasScale:SetSize(cw, ch)
-        if resized and zoomScale == FIT_ZOOM then CenterPan() end
+        if resized and zoomScale == fitZoom then CenterPan() end
         ClampPan()
         ApplyCanvasTransform()
         -- zoomAnchorX/Y (see ZoomBy) are canvas-local coordinates measured
