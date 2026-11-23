@@ -85,7 +85,7 @@ local SLIDER_W     = 16   -- the track itself: a stock scroll bar's width
 -- Clearance kept free on the right of the fitted view for the depth slider:
 -- its column, the 2px inset it sits in, and 50px of breathing room beyond
 -- that, so a freshly fitted cave never opens underneath it.
-local SLIDER_CLEAR = SLIDER_COL_W + 2 + 50
+local SLIDER_CLEAR = SLIDER_COL_W + 17
 -- The thumb never reaches the very ends of a vertical Slider's track (half
 -- its height is always inside it), so anything else meant to track a
 -- fraction of the track (the height-window rectangle) has to live inside the
@@ -127,8 +127,8 @@ local MAX_CONTENT  = 640
 -- the whole cave visible and nothing cropped. MIN_ZOOM sits below that so
 -- the user can zoom out for the bigger picture even when the cave already
 -- fills the canvas; at those scales the canvas is smaller than the viewport
--- and ClampPan just holds it centered, so there is no backdrop to reveal
--- and no pan to lose. MAX_ZOOM is capped well short of the point where the
+-- and can be dragged anywhere within the pan range (see ClampPan), including
+-- fully out of view. MAX_ZOOM is capped well short of the point where the
 -- base layer's own tile resolution would stretch into an obvious blurry
 -- blob, since this magnifies the art already drawn rather than fetching a
 -- sharper source layer (see ArtLayer below).
@@ -1425,20 +1425,17 @@ local function CursorOverArt()
     return not (list and list:IsShown() and list:IsMouseOver())
 end
 
---- Keep canvasScale from being panned out of a sensible position: zoomed in
---- far enough that the canvas is larger than the viewport on an axis, it may
---- not slide far enough to show the flat backdrop on that axis; smaller, it
---- may slide anywhere that keeps it fully inside the viewport. Both cases
---- are one range between 0 and the offset that puts the far edge flush,
---- which also makes the range collapse to nothing where the canvas exactly
---- matches the viewport. panY grows upward (see ContentCursorXY), hence the
---- opposite sign to panX.
+--- Keep the cave picture from being dragged out of reach. The pan range runs
+--- from where the picture has just slid fully out of view on one side to where
+--- it has just slid fully out of view on the other, so the user can pan it
+--- completely off screen but no further. panY grows upward (see
+--- ContentCursorXY), so the top edge sits at panY and the bottom at panY - sh.
 local function ClampPan()
-    local a = contentW - canvasW * zoomScale
-    panX = math.max(math.min(0, a), math.min(math.max(0, a), panX))
+    local sw = canvasW * zoomScale
+    panX = math.max(-sw, math.min(contentW, panX))
 
-    local b = canvasH * zoomScale - contentH
-    panY = math.max(math.min(0, b), math.min(math.max(0, b), panY))
+    local sh = canvasH * zoomScale
+    panY = math.max(-contentH, math.min(sh, panY))
 end
 
 --- Canvas centred in the viewport at the current zoom.
