@@ -32,9 +32,10 @@ from urllib.request import Request, urlopen
 from ..config.build import USER_AGENT
 from ..config.interior import INTERIOR_PROBE_WORKERS
 from ..config.paths import LISTFILE_CACHE, WMO_CACHE_DIR, WMO_TILE_CACHE_DIR
+from ..gamedata.tables import fetch_pinned_table
 from ..infra.http import download_casc_cached
 from .mines import MINES, MineSpec
-from .wmo import iter_modf_placements
+from .wmo import iter_modf_placements, parse_wmo_id
 
 LISTFILE_URL = ("https://github.com/wowdev/wow-listfile/releases/latest/"
                 "download/community-listfile.csv")
@@ -60,6 +61,7 @@ class Indoor:
     spec: MineSpec
     map_id: int
     label: str  # WMO file name, for debugging; the window title is the client's subzone
+    areas: frozenset[int]  # AreaTable IDs WMOAreaTable gives this placement
 
 
 def _download_listfile(path: Path) -> None:
@@ -138,6 +140,16 @@ def _group_tiles(raw: dict[tuple[int, int, int], int],
             for g, t in sorted(by_group.items())}
 
 
+def _wmo_areas() -> dict[tuple[int, int], set[int]]:
+    """``{(WMOID, NameSetID): {AreaTableID}}`` from WMOAreaTable."""
+    out: dict[tuple[int, int], set[int]] = {}
+    for row in fetch_pinned_table("WMOAreaTable"):
+        area = int(row["AreaTableID"])
+        if area:
+            out.setdefault((int(row["WMOID"]), int(row["NameSetID"])), set()).add(area)
+    return out
+
+
 def discover_indoors(verbose: bool = True) -> list[Indoor]:
     """Every placed WMO interior with baked minimap art that isn't a
     hand-registered mine, ordered by MODF uniqueId (so synthetic FileDataIDs
@@ -170,6 +182,7 @@ def discover_indoors(verbose: bool = True) -> list[Indoor]:
 
     out: list[Indoor] = []
     tilted = 0
+    wmo_areas = _wmo_areas()
     next_fdid = INDOOR_FDID_BASE
     for uid in sorted(placements):
         adt, wmo_fdid, placement = placements[uid]
@@ -183,6 +196,7 @@ def discover_indoors(verbose: bool = True) -> list[Indoor]:
         # Floor composite, then one piece per tiled group (emit_cave_tiles).
         floor_fdid = next_fdid
         next_fdid += 1 + len(tile_fdids)
+        root = (WMO_CACHE_DIR / f"{wmo_fdid}.blp").read_bytes()
         out.append(Indoor(
             spec=MineSpec(
                 key=f"Indoor{uid}", wmo_fdid=wmo_fdid, tile_fdids=tile_fdids,
@@ -192,6 +206,8 @@ def discover_indoors(verbose: bool = True) -> list[Indoor]:
                 single_floor=True),
             map_id=WORLD_MAPS[adts[adt]],
             label=wmo_paths[wmo_fdid].rsplit("/", 1)[-1],
+            areas=frozenset(wmo_areas.get(
+                (parse_wmo_id(root), placement.name_set), ())),
         ))
     if verbose:
         print(f"  {len(out)} indoors with art on this build"

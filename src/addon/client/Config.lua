@@ -52,9 +52,9 @@ Config.DEFAULTS = {
     caveKeepOpen      = false,
 
     -- caveOtherIndoors: also open the window for buildings, houses and
-    -- every other WMO interior (places the generator marks kind = "indoor"),
-    -- not just caves, mines and dungeons. Off by default: there are far more
-    -- of them and most are one-room houses.
+    -- every other WMO interior (places the generator marks kind = "indoor"
+    -- without cave = true), not just caves, mines and dungeons. Off by
+    -- default: there are far more of them and most are one-room houses.
     caveOtherIndoors  = false,
 
     -- Instance map: the same window inside dungeon ("party") and raid

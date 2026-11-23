@@ -128,6 +128,10 @@ function CaveTable:Load()
                 name    = src.name,
                 kind    = src.kind,
                 mapID   = src.mapID,
+                -- True on the indoor places the generator knows to be caves or
+                -- mines (config/interior.py CAVE_AREA_IDS): they open the window
+                -- without the Other indoors option, like a hand-baked cave.
+                cave    = src.cave,
                 areaIDs = src.areaIDs or {},
                 bounds  = src.bounds,
                 -- World<->pixel projection for rotated, WMO-local-coordinate
@@ -428,13 +432,16 @@ local function PlayerAreaNames()
 end
 
 --- The smallest "indoor" place whose footprint holds (worldX, worldY), or
---- nil. Only while the Other indoors option is on.
+--- nil. Buildings and houses only while the Other indoors option is on; places
+--- flagged `cave` always.
 ---@return table|nil place
 local function IndoorAt(mapID, worldX, worldY)
-    if not (worldX and Config.db and Config.db.caveOtherIndoors) then return nil end
+    if not (worldX and Config.db) then return nil end
+    local all = Config.db.caveOtherIndoors
     local best, bestArea
     for _, place in ipairs(indoorPlaces) do
-        if (mapID == nil or place.mapID == mapID)
+        if (all or place.cave)
+           and (mapID == nil or place.mapID == mapID)
            and Contains(place.bounds, worldX, worldY) then
             local area = RectArea(place.bounds)
             if not bestArea or area < bestArea then

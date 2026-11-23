@@ -5,7 +5,8 @@ minimap art and is not one of the hand-registered mines in hfwm/caves/mines.py
 (see hfwm/caves/indoors.py for how they are found). Each one is baked exactly
 like a mine -- scripts/emit_cave_tiles.py's mine_bake -- and then described
 the way CaveData.lua describes a place, with ``kind = "indoor"`` so the addon
-only uses it while the "Other indoors" option is on.
+only uses it while the "Other indoors" option is on -- unless the WMO's area is
+one of interior.CAVE_AREA_IDS, which adds ``cave = true`` and exempts it.
 Entries in SUBMAPS are the exception: they are not places at all. See submap_lua.
 
     python3 scripts/emit_indoors.py
@@ -35,6 +36,7 @@ from hfwm.caves.compose import MINIMAP_PX_PER_UNIT, world_to_local_projection  #
 from hfwm.caves.indoors import discover_indoors  # noqa: E402
 from hfwm.caves.wmo import world_z_range_for_groups  # noqa: E402
 from hfwm.config.build import GAME_BUILD  # noqa: E402
+from hfwm.config.interior import CAVE_AREA_IDS  # noqa: E402
 from hfwm.config.paths import (  # noqa: E402
     SUB_MAPS_FILE, INDOOR_DATA_FILE, INDOOR_TILES_FILE, MINIMAP_DB_CACHE)
 from hfwm.config.tiles import TILE_WORLD_SIZE  # noqa: E402
@@ -102,6 +104,8 @@ def place_lua(indoor, canvas, with_pieces):
     w, h = canvas["w1"], canvas["h1"]
     bounds = "{" + ",".join(_num(v) for v in world_bounds(canvas)) + "}"
     head = [f'name="{indoor.label}"', 'kind="indoor"', f"mapID={indoor.map_id}"]
+    if indoor.areas & CAVE_AREA_IDS.keys():
+        head.append("cave=true")
     parts = head + [
         f"bounds={bounds}",
         "projection={" + _fields(**{
