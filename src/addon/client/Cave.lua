@@ -828,6 +828,15 @@ function Cave:UpdateState()
         -- off, or Remember State closed, silently stopped mattering after
         -- the first leave-and-return.
         Config.caveSuppressedKey = nil
+        Config.caveEntrance      = nil
+        -- Only a player map that is known and not an interior is "outside";
+        -- nil (loading screen) or "world map is on this cave" is not, and
+        -- must not forget the saved entrance.
+        local here = self:GetCurrentFloorMapID()
+        if here and not IsInteriorMap(here) then
+            Config.caveSawOutside = true
+            Config.dbObj.char.caveEntrance = nil
+        end
         Config.caveDecidedKey    = nil
         Config.caveEscHidden     = false
         if Config.caveOverlayActive then ns.CaveRenderer:HideCave() end
@@ -848,9 +857,27 @@ function Cave:UpdateState()
     -- suppressed.
     if Config.caveDecidedKey ~= groupKey then
         Config.caveDecidedKey = groupKey
+        -- Entrance: kept per character (the profile is shared) so it survives
+        -- /reload and logging out. Only a crossing actually seen this session
+        -- is recorded; a login that lands inside a cave has no entrance to
+        -- show, unless one was saved for this same cave.
+        local char = Config.dbObj.char
+        if char.caveEntrance and char.caveEntrance.key ~= groupKey then
+            char.caveEntrance = nil
+        end
+        if not char.caveEntrance and Config.caveSawOutside then
+            local ex, ey = self:GetPlayerMapXY(playerMapID)
+            if ex and ey and (ex ~= 0 or ey ~= 0) then
+                char.caveEntrance = { key = groupKey, mapID = playerMapID, x = ex, y = ey }
+            end
+        end
+        Config.caveEntrance = char.caveEntrance
+        local state = Config.db.caveDefaultState
         local openByDefault
-        if Config.db.caveRememberState then
+        if state == "remember" then
             openByDefault = Config.db.caveLastVisible ~= false
+        elseif state == "minimized" then
+            openByDefault = false
         else
             openByDefault = Config.db.caveAutoOpen ~= false
         end

@@ -82,6 +82,10 @@ local ACE_FRAME_BOTTOM_INSET_NO_STATUS = 20  -- tighter: no pane to leave room f
 local PIN_GAP = 6
 local SLIDER_COL_W = 30   -- depth slider gutter, only when there are floors
 local SLIDER_W     = 16   -- the track itself: a stock scroll bar's width
+-- Clearance kept free on the right of the fitted view for the depth slider:
+-- its column, the 2px inset it sits in, and 50px of breathing room beyond
+-- that, so a freshly fitted cave never opens underneath it.
+local SLIDER_CLEAR = SLIDER_COL_W + 17
 -- The thumb never reaches the very ends of a vertical Slider's track (half
 -- its height is always inside it), so anything else meant to track a
 -- fraction of the track (the height-window rectangle) has to live inside the
@@ -96,6 +100,9 @@ local HEIGHT_WINDOW_HANDLE_H = 8
 -- fixed per-piece margin. Not user-adjustable; the window rectangle itself
 -- is the adjustable control now.
 local EDGE_FADE_YARDS = 2
+-- Right-hand margin, in UI pixels, kept clear of the quest objective tracker
+-- button when the window is maximised (WorldMapFrame.SidePanelToggle).
+local MAXIMIZED_RIGHT_PAD = 35
 -- Fraction of the map frame the content is allowed to eat. A cave map that
 -- covers the zone it is a hole in defeats the point of being a window, so
 -- this is what governs that: the window grows and shrinks with the map, so
@@ -120,8 +127,8 @@ local MAX_CONTENT  = 640
 -- the whole cave visible and nothing cropped. MIN_ZOOM sits below that so
 -- the user can zoom out for the bigger picture even when the cave already
 -- fills the canvas; at those scales the canvas is smaller than the viewport
--- and ClampPan just holds it centered, so there is no backdrop to reveal
--- and no pan to lose. MAX_ZOOM is capped well short of the point where the
+-- and can be dragged anywhere within the pan range (see ClampPan), including
+-- fully out of view. MAX_ZOOM is capped well short of the point where the
 -- base layer's own tile resolution would stretch into an obvious blurry
 -- blob, since this magnifies the art already drawn rather than fetching a
 -- sharper source layer (see ArtLayer below).
@@ -141,12 +148,17 @@ local ZOOM_STEP = 1.25
 local ZOOM_ANCHOR_EPSILON = 1.5
 
 local PIN_TEXTURE = "Interface\\Minimap\\MinimapArrow"
-local PIN_SIZE    = 26
+local PIN_SIZE    = 40
 
 -- The world map's own corpse pin (CorpsePinTemplate): POIIcons' tombstone.
 local CORPSE_TEXTURE   = "Interface\\Minimap\\POIIcons"
 local CORPSE_TEXCOORDS = { 0.56640625, 0.6328125, 0.001953125, 0.03515625 }
 local CORPSE_PIN_SIZE  = 24
+
+-- Where the player came in (Config.caveEntrance): the first atlas the client
+-- has, door-like first.
+local ENTRANCE_ATLASES  = { "poi-door", "Dungeon" }
+local ENTRANCE_PIN_SIZE = 24
 
 local PIN_UPDATE_INTERVAL = 0.05  -- 20fps is plenty for a map pin
 
@@ -176,12 +188,16 @@ local BLIZZARD_CYAN_HEX = FRIENDS_BNET_NAME_COLOR_CODE or "|cff82c5ff"
 -------------------------------------------------------------------------------
 local aceWindow     -- the AceGUI-3.0 Frame widget itself
 local window        -- aceWindow.frame: the actual frame, pinned in place
+local maxMinFrame   -- maximise/minimise button pair, left of closeBtn
+local maximized = false  -- window fills the world map's pane
+local ApplyMaximized     -- forward declaration; see above EnsureWindow
 local closeBtn      -- the x, in the top-right corner (Ace's own "Close"
                     -- button is hidden; see EnsureWindow)
 local content       -- clipping frame the tiles and the pin live in
 local canvasScale   -- child of content: zoomed/panned, holds tiles + pin
 local playerPin
 local corpsePin
+local entrancePin
 local groupPins = {}  -- class-coloured dots for the rest of the group, grown on demand; each fill has its ring at .border
 local function HideGroupPins(from)
     for i = from, #groupPins do
@@ -210,6 +226,12 @@ local statusbg      -- aceWindow.statustext's own parent frame (the pane
 -- `heightWindowDrag` below (OnMouseDown to start, OnUpdate plus a live
 -- IsMouseButtonDown check to follow and to notice release).
 local zoomScale    = FIT_ZOOM
+-- Zoom that contains the canvas in the area left of the depth slider. Set by
+-- LayoutWindow; the "fitted view" every reset and fresh open returns to.
+local fitZoom      = FIT_ZOOM
+-- Right-hand gutter (px) the initial fit leaves clear for the depth slider;
+-- 0 when the cave has no slider. Set by LayoutWindow, read by CenterPan.
+local fitInsetR    = 0
 local panX, panY   = 0, 0
 local contentDrag
 
@@ -263,6 +285,11 @@ local caveBorder, caveHeader
 -- window has to line up with the slider thumb exactly or the widget looks
 -- broken.
 local contentW, contentH = 0, 0
+-- Art canvas size (it covers the viewport, so it can be larger on an axis),
+-- and the depth slider's height.
+local canvasW, canvasH = 0, 0
+local sliderH = 0
+local CenterPan  -- defined with ClampPan
 
 -------------------------------------------------------------------------------
 -- Inline texture pool (owned by the content frame)
@@ -369,21 +396,24 @@ end
 local ACE_HEADER_FDID = 131080  -- Interface\DialogFrame\UI-DialogBox-Header, as AceGUI-3.0 sets it
 local DIALOG_FILL = "Interface\\DialogFrame\\UI-DialogBox-Background"  -- DialogBorderTemplate's Bg
 
-local dialogFill   -- the dialog's tiled background, behind the art too
+local DIALOG_INSET = 7  -- how far inside the window the dialog background (and the art over it) starts
+local dialogFill   -- the dialog's tiled background, behind the art
 
 --- The dialog background, as DialogBorderTemplate's Bg lays it out (7px
---- inside the window). Spans the whole window, so the transparent canvas
---- shows it. Fades with the cave opacity setting, so at 0% only the
---- border and map elements remain.
+--- inside the window, which is exactly where `content` spans). It is a
+--- texture of `content` itself, not of the window: a window's own textures
+--- are drawn after a same-level child frame, which put the fill over the art
+--- and dimmed it. On `content`'s BACKGROUND layer it is under the art's
+--- canvas frame by construction. Fades with the cave opacity setting, so at
+--- 0% only the border and map elements remain.
 local function LayoutDialogFill()
-    if not window then return end
+    if not content then return end
     if not dialogFill then
-        dialogFill = window:CreateTexture(nil, "BACKGROUND", nil, -8)
+        dialogFill = content:CreateTexture(nil, "BACKGROUND", nil, -8)
         dialogFill:SetTexture(DIALOG_FILL, "REPEAT", "REPEAT")
         dialogFill:SetHorizTile(true)
         dialogFill:SetVertTile(true)
-        dialogFill:SetPoint("TOPLEFT", 7, -7)
-        dialogFill:SetPoint("BOTTOMRIGHT", -7, 7)
+        dialogFill:SetAllPoints(content)
     end
     dialogFill:SetAlpha(Config:CaveAlpha())
 end
@@ -503,7 +533,7 @@ end
 --- (which hides the status pane itself) so the two can never disagree
 --- about which state the window is in.
 local function StatusBarNeeded()
-    return not (FloorCount() > 1 and Config.caveFloorFilterAll)
+    return FloorCount() > 1 and not Config.caveFloorFilterAll
 end
 
 --- Step the active floor by `delta` indices, clamped. Index 1 is the topmost
@@ -801,7 +831,7 @@ end
 --- if the cursor has strayed outside it.
 local function CursorTrackFrac()
     if not sliderTrack then return 0 end
-    local trackH = contentH
+    local trackH = sliderH
     if trackH <= 0 then return 0 end
     local usable = trackH - SLIDER_INSET * 2
     if usable <= 0 then return 0 end
@@ -818,7 +848,7 @@ end
 --- Place the rectangle from Config's current window fractions.
 local function LayoutHeightWindow()
     if not windowBody then return end
-    local trackH = contentH
+    local trackH = sliderH
     local usable = trackH - SLIDER_INSET * 2
     if usable <= 0 then
         windowBody:Hide()
@@ -1179,11 +1209,12 @@ local function EnsureFloorPicker()
     end
 
     dd:ClearAllPoints()
-    -- +14, not flush: the template's own end-cap art sits inset from the
-    -- frame's true edges, so anchoring flush would leave the *visible*
-    -- widget floating short of content's own left edge. This is a
-    -- by-eye nudge, not a measured one; worth another look in-game.
-    dd:SetPoint("BOTTOMLEFT", content, "TOPLEFT", -14, 0)
+    -- Top-right of the dialog's content region, on the right like the depth
+    -- slider below it. +14, not flush: the template's own end-cap art sits
+    -- inset from the frame's true edges, so anchoring flush would leave the
+    -- *visible* widget floating short of the edge. This is a by-eye nudge,
+    -- not a measured one; worth another look in-game.
+    dd:SetPoint("TOPRIGHT", aceWindow.content, "TOPRIGHT", 14, 0)
     -- Above content's own tiles: both are plain children of `window` and
     -- would otherwise share its default child level, which draw-order
     -- ties in creation order rather than anything this file controls.
@@ -1385,24 +1416,32 @@ local function CursorOverArt()
     if floorPicker and floorPicker:IsShown() and floorPicker:IsMouseOver() then
         return false
     end
+    -- The depth slider is drawn over the art's right edge; a press on it is
+    -- a slider interaction, not a pan.
+    if sliderCol and sliderCol:IsShown() and sliderCol:IsMouseOver() then
+        return false
+    end
     local list = _G.DropDownList1
     return not (list and list:IsShown() and list:IsMouseOver())
 end
 
---- Keep canvasScale from being panned out of a sensible position: zoomed in
---- (zoomScale > 1) the canvas is larger than the viewport,
---- so it may not slide far enough to show the flat backdrop; zoomed out
---- (zoomScale < 1) it is smaller, so it may slide anywhere that keeps it
---- fully inside the viewport. Both cases are one range between 0 and the
---- offset that puts the far edge flush, which also makes the range collapse
---- to nothing at the exact fit (zoomScale 1), where there is no room to pan.
---- panY grows upward (see ContentCursorXY), hence the opposite sign to panX.
+--- Keep the cave picture from being dragged out of reach. The pan range runs
+--- from where the picture has just slid fully out of view on one side to where
+--- it has just slid fully out of view on the other, so the user can pan it
+--- completely off screen but no further. panY grows upward (see
+--- ContentCursorXY), so the top edge sits at panY and the bottom at panY - sh.
 local function ClampPan()
-    local a = contentW * (1 - zoomScale)
-    panX = math.max(math.min(0, a), math.min(math.max(0, a), panX))
+    local sw = canvasW * zoomScale
+    panX = math.max(-sw, math.min(contentW, panX))
 
-    local b = contentH * (zoomScale - 1)
-    panY = math.max(math.min(0, b), math.min(math.max(0, b), panY))
+    local sh = canvasH * zoomScale
+    panY = math.max(-contentH, math.min(sh, panY))
+end
+
+--- Canvas centred in the viewport at the current zoom.
+function CenterPan()
+    panX = (contentW - fitInsetR - canvasW * zoomScale) / 2
+    panY = (canvasH * zoomScale - contentH) / 2
 end
 
 --- Pins live on canvasScale, so zoomScale would magnify them along with the
@@ -1410,6 +1449,12 @@ end
 local function ApplyPinScale()
     local inv = 1 / zoomScale
     if playerPin then playerPin:SetSize(PIN_SIZE * inv, PIN_SIZE * inv) end
+    if entrancePin then
+        local u = ENTRANCE_PIN_SIZE * inv
+        entrancePin:SetSize(u, u)
+        entrancePin.glow:SetSize(u * 2.6, u * 2.6)
+        entrancePin.glintTex:SetSize(u * 2, u * 2)
+    end
     if corpsePin then corpsePin:SetSize(CORPSE_PIN_SIZE * inv, CORPSE_PIN_SIZE * inv) end
     local s = GROUP_PIN_SIZE * inv
     local b = (GROUP_PIN_SIZE + 2 * GROUP_PIN_BORDER) * inv
@@ -1439,8 +1484,8 @@ end
 --- what the shift+right-click reset on the window snaps to, so both mean
 --- exactly "the view a freshly opened cave starts with".
 local function ResetViewTransform()
-    zoomScale = FIT_ZOOM
-    panX, panY = 0, 0
+    zoomScale = fitZoom
+    CenterPan()
     contentDrag = nil
     zoomAnchorX, zoomAnchorY = nil, nil
     ApplyCanvasTransform()
@@ -1598,6 +1643,11 @@ local mapSeen = false  -- the map has been shown this session, so its scale is t
 local function PositionWindow()
     if not window then return end
     window:ClearAllPoints()
+    if maximized then
+        pinnedTo = WorldMapFrame.ScrollContainer or WorldMapFrame
+        window:SetPoint("TOPLEFT", pinnedTo, "TOPLEFT", 0, 0)
+        return
+    end
     local pt = Config.db and Config.db.cavePlacement == "remember" and Config.db.caveWindowPoint
     if pt then
         local r = window:GetEffectiveScale() / UIParent:GetEffectiveScale()
@@ -1712,6 +1762,20 @@ function CaveRenderer:SetMapOpen(open)
     self:Repin()
 end
 
+--- Enter or leave the maximised state: the window fills the world map's pane
+--- and can't be dragged away from it. Syncs the button; relayout is the
+--- caller's job.
+local syncingButton = false
+function ApplyMaximized(on)
+    maximized = on
+    window:SetMovable(not on)
+    if maxMinFrame then
+        syncingButton = true
+        if on then maxMinFrame:Maximize(true) else maxMinFrame:Minimize(true) end
+        syncingButton = false
+    end
+end
+
 local function EnsureWindow()
     if window then return end
 
@@ -1739,7 +1803,7 @@ local function EnsureWindow()
     -- Stored in UIParent units so it survives the window's scale changing
     -- between parents (see ShowCave).
     aceWindow.titletext:GetParent():HookScript("OnMouseUp", function()
-        if Config.db.cavePlacement ~= "remember" then return end
+        if Config.db.cavePlacement ~= "remember" or maximized then return end
         local r = window:GetEffectiveScale() / UIParent:GetEffectiveScale()
         Config.db.caveWindowPoint = { left = window:GetLeft() * r, top = window:GetTop() * r }
     end)
@@ -1784,12 +1848,46 @@ local function EnsureWindow()
         ns.Cave:UpdateState()
     end)
 
-    -- Content: the clipping/zoom-pan area, parented to the Ace3 frame's own
-    -- content region (aceWindow.content), which already excludes the
-    -- title bar, status bar and border around it. Same role `content` has
-    -- always had here; only its parent chain changed.
-    content = CreateFrame("Frame", nil, aceWindow.content)
-    content:SetPoint("TOPLEFT", aceWindow.content, "TOPLEFT", 0, 0)
+    -- Maximise / minimise: the world map's own button template, so it looks
+    -- the same as WorldMapFrame.BorderFrame.MaximizeMinimizeFrame, with its
+    -- centre-right on the close button's centre-left, as the map does it.
+    local mm = CreateFrameTry("Frame", nil, window, "MaximizeMinimizeButtonFrameTemplate")
+    if mm.SetOnMaximizedCallback and mm.SetOnMinimizedCallback then
+        mm:SetFrameLevel(window:GetFrameLevel() + 10)
+        mm:SetPoint("RIGHT", close, "LEFT", 0, 0)
+        -- Same size as the close button beside it; the template's own
+        -- buttons are bigger.
+        mm:SetSize(20, 20)
+        mm.MaximizeButton:SetSize(20, 20)
+        mm.MinimizeButton:SetSize(20, 20)
+        -- The template fires these on programmatic Maximize/Minimize too
+        -- (the argument is isAutomaticAction, not a skip flag), so
+        -- ApplyMaximized's own button sync must not loop back in.
+        mm:SetOnMaximizedCallback(function()
+            if syncingButton then return end
+            ApplyMaximized(true)
+            if Config.db then Config.db.caveMaximized = true end
+            CaveRenderer:Relayout()
+        end)
+        mm:SetOnMinimizedCallback(function()
+            if syncingButton then return end
+            ApplyMaximized(false)
+            if Config.db then Config.db.caveMaximized = false end
+            CaveRenderer:Relayout()
+        end)
+        maxMinFrame = mm
+        ApplyMaximized(false)
+    else
+        mm:Hide()
+    end
+
+    -- Content: the clip/zoom-pan viewport. LayoutWindow spans it over the
+    -- whole dialog background. It sits at the window's own frame level, under
+    -- the title bar, status pane, picker, slider and border, which all draw
+    -- over the art.
+    content = CreateFrame("Frame", nil, window)
+    content:SetFrameLevel(window:GetFrameLevel())
+    content:SetPoint("TOPLEFT", window, "TOPLEFT", DIALOG_INSET, -DIALOG_INSET)
     if content.SetClipsChildren then content:SetClipsChildren(true) end
 
     CaveRenderer:ApplyAlpha()
@@ -1811,7 +1909,7 @@ local function EnsureWindow()
         ZoomBy(dir > 0 and ZOOM_STEP or (1 / ZOOM_STEP))
     end)
     content:SetScript("OnMouseDown", function(_, button)
-        if button == "LeftButton" then BeginContentPan() end
+        if button == "LeftButton" and CursorOverArt() then BeginContentPan() end
     end)
     content:SetScript("OnUpdate", ContentPanUpdate)
     -- Same wheel handler on the window, gated on the cursor being over the
@@ -1834,6 +1932,75 @@ local function EnsureWindow()
     corpsePin:SetTexCoord(unpack(CORPSE_TEXCOORDS))
     corpsePin:SetSize(CORPSE_PIN_SIZE, CORPSE_PIN_SIZE)
     corpsePin:Hide()
+
+    -- A frame, so the door, its halo and the glint scale and fade as one.
+    -- Frames paint over the parent's textures, so it sits above the player
+    -- arrow; harmless, the two are only ever together at the entrance.
+    entrancePin = CreateFrame("Frame", nil, canvasScale)
+    entrancePin:Hide()
+
+    -- Closes the hover label (see UpdateEntrancePin) if the pin hides
+    -- while it is up.
+    entrancePin:SetScript("OnHide", function(self)
+        if GameTooltip:GetOwner() == self then GameTooltip:Hide() end
+    end)
+
+    -- Warm halo behind the door, breathing.
+    local glow = entrancePin:CreateTexture(nil, "BACKGROUND")
+    glow:SetTexture("Interface\\GLUES\\Models\\UI_Draenei\\GenericGlow64")
+    glow:SetBlendMode("ADD")
+    glow:SetVertexColor(1, 0.8, 0.35)
+    glow:SetPoint("CENTER")
+    entrancePin.glow = glow
+
+    local door = entrancePin:CreateTexture(nil, "ARTWORK")
+    local atlas
+    for _, name in ipairs(ENTRANCE_ATLASES) do
+        if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(name) then
+            atlas = name break
+        end
+    end
+    if atlas then
+        door:SetAtlas(atlas)
+    else
+        door:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+    end
+    door:SetAllPoints()
+
+    -- Metal glint: a four-point star that flares over the door and fades,
+    -- twisting as it goes, then rests before the next one.
+    local glint = entrancePin:CreateTexture(nil, "OVERLAY")
+    glint:SetTexture("Interface\\Cooldown\\star4")
+    glint:SetBlendMode("ADD")
+    glint:SetVertexColor(1, 0.95, 0.8)
+    glint:SetAlpha(0)
+    glint:SetPoint("CENTER")
+    entrancePin.glintTex = glint
+
+    -- Entrance: 0.4s fade-in, settling from double size.
+    local intro = entrancePin:CreateAnimationGroup()
+    local fade = intro:CreateAnimation("Alpha")
+    fade:SetFromAlpha(0) fade:SetToAlpha(1) fade:SetDuration(0.4)
+    local grow = intro:CreateAnimation("Scale")
+    grow:SetScaleFrom(2, 2) grow:SetScaleTo(1, 1)
+    grow:SetDuration(0.4) grow:SetOrigin("CENTER", 0, 0)
+    entrancePin.intro = intro
+
+    local pulse = glow:CreateAnimationGroup()
+    pulse:SetLooping("BOUNCE")
+    local breathe = pulse:CreateAnimation("Alpha")
+    breathe:SetFromAlpha(0.35) breathe:SetToAlpha(0.9) breathe:SetDuration(1.2)
+    entrancePin.pulse = pulse
+
+    local sweep = glint:CreateAnimationGroup()
+    local flare = sweep:CreateAnimation("Alpha")
+    flare:SetFromAlpha(0) flare:SetToAlpha(1) flare:SetDuration(0.15) flare:SetOrder(1)
+    local spin = sweep:CreateAnimation("Rotation")
+    spin:SetDegrees(-90) spin:SetDuration(0.6) spin:SetOrder(1) spin:SetOrigin("CENTER", 0, 0)
+    local wane = sweep:CreateAnimation("Alpha")
+    wane:SetFromAlpha(1) wane:SetToAlpha(0) wane:SetDuration(0.45) wane:SetStartDelay(0.15) wane:SetOrder(1)
+    entrancePin.glint = sweep
+    ApplyPinScale()
 
     PositionWindow()
     ResetView:HookFrame(window, function(_, button)
@@ -1860,6 +2027,13 @@ local function EnsureWindow()
     -- The status bar's own background pane, so it (and not just its text)
     -- can be hidden outright when "All" floors is selected; see ShowCave.
     statusbg = aceWindow.statustext:GetParent()
+    -- The level readout sits on the right, like the slider and picker. Ace
+    -- keeps ~117px of the pane's right end for its own Close button, which
+    -- is hidden here, so the pane is widened to the window's edge.
+    aceWindow.statustext:SetJustifyH("RIGHT")
+    statusbg:ClearAllPoints()
+    statusbg:SetPoint("BOTTOMLEFT", window, "BOTTOMLEFT", 15, 15)
+    statusbg:SetPoint("BOTTOMRIGHT", window, "BOTTOMRIGHT", -15, 15)
 end
 
 -------------------------------------------------------------------------------
@@ -1924,60 +2098,98 @@ local function LayoutWindow(floorMapID)
     local mapW, mapH = WorldMapFrame:GetSize()
     if not mapW or mapW <= 0 then mapW, mapH = 1024, 768 end
 
-    -- Window scale preference (Options slider): a multiplier on the box the
-    -- fractions below compute, so the same setting works on every map size.
-    local scale = Config:CaveWindowScale()
-    local maxW = math.max(MIN_CONTENT,
-        math.min(MAX_CONTENT, mapW * MAP_FRACTION_W * scale))
-    local maxH = math.max(MIN_CONTENT,
-        math.min(MAX_CONTENT, mapH * MAP_FRACTION_H * scale))
-
-    -- Fit inside the box, preserving aspect.
-    local w, h = maxW, maxW / aspect
-    if h > maxH then
-        h = maxH
-        w = maxH * aspect
-    end
-
-    -- A single-floor place with active pieces (Echo Ridge Mine, e.g.) still
-    -- gets the gutter: SyncSlider shows it for exactly that case too (see
-    -- its own comment), and this must agree or the column it shows would
-    -- have no room reserved for it and overhang the window's left edge.
+    -- The depth slider (shown for multi-floor places, and for a single-floor
+    -- place with active pieces; see SyncSlider) and the floor picker are
+    -- drawn over the art, on the right.
     local hasSlider = FloorCount() > 1 or piecesActive
-    -- +2 for the gap sliderCol is anchored with below, so the gutter is wide
-    -- enough to hold the whole column instead of letting it overhang the
-    -- left border by that gap.
-    local gutter    = hasSlider and (SLIDER_COL_W + 2) or 0
 
-    -- Multi-floor places carry the floor picker above the art, not over it:
-    -- EnsureFloorPicker anchors the picker's BOTTOM to content's TOP, and
-    -- content is dropped by the picker's own height so the two meet.
-    -- Single-floor: no picker, no pad, art stays flush with the top.
+    -- Multi-floor places reserve a row under the title for the floor picker
+    -- (EnsureFloorPicker anchors it to the top of `.content`); the depth
+    -- slider starts below it. Single-floor: no picker, no row.
     local topPad = 0
     if FloorCount() > 1 then
         EnsureFloorPicker()
         if floorPicker then topPad = floorPicker:GetHeight() end
     end
+
+    -- The bottom inset shrinks when the status pane has nothing to show
+    -- (see StatusBarNeeded/ShowCave).
+    local bottomInset = StatusBarNeeded() and ACE_FRAME_BOTTOM_INSET_STATUS
+        or ACE_FRAME_BOTTOM_INSET_NO_STATUS
+
+    -- Window size. Maximised: the whole window fills the world map's pane
+    -- (in this window's own units, since it can be a UIParent child at
+    -- another scale).
+    local winW, winH
+    if maximized then
+        local pane = WorldMapFrame.ScrollContainer or WorldMapFrame
+        local k = pane:GetEffectiveScale() / window:GetEffectiveScale()
+        local pw, ph = pane:GetWidth() * k, pane:GetHeight() * k
+        -- Leave a right-hand margin so the window never runs under the quest
+        -- objective tracker's open button (WorldMapFrame.SidePanelToggle).
+        -- 30 UI pixels, converted into this window's own units.
+        local padR = MAXIMIZED_RIGHT_PAD * UIParent:GetEffectiveScale() / window:GetEffectiveScale()
+        pw = pw - padR
+        if pw > 0 and ph > 0 then winW, winH = pw, ph end
+    end
+    if not winW then
+        -- Window scale preference (Options slider): a multiplier on the box
+        -- the fractions below compute, so the same setting works on every
+        -- map size.
+        local scale = Config:CaveWindowScale()
+        local maxW = math.max(MIN_CONTENT,
+            math.min(MAX_CONTENT, mapW * MAP_FRACTION_W * scale))
+        local maxH = math.max(MIN_CONTENT,
+            math.min(MAX_CONTENT, mapH * MAP_FRACTION_H * scale))
+        -- Fit the art's box inside, preserving aspect; the chrome goes
+        -- around it.
+        local w, h = maxW, maxW / aspect
+        if h > maxH then
+            h = maxH
+            w = maxH * aspect
+        end
+        winW = w + ACE_FRAME_WIDTH_OVERHEAD
+        winH = h + topPad + ACE_FRAME_TOP_INSET + bottomInset
+    end
+
+    -- The viewport is the whole dialog background, and the art covers all of
+    -- it (cropping whatever overflows, behind the chrome) instead of sitting
+    -- in a box inside it.
+    local vw, vh = winW - 2 * DIALOG_INSET, winH - 2 * DIALOG_INSET
+    -- Canvas covers the whole viewport, as before; panning can reach all of it.
+    local cw, ch = vw, vw / aspect
+    if ch < vh then
+        ch = vh
+        cw = vh * aspect
+    end
+    -- The initial (fitted) zoom contains that canvas in the area left of the
+    -- depth slider's gutter, so the cave opens clear of the slider. Zoom and
+    -- pan afterwards are unrestricted. A view already at the fit follows the
+    -- new fit on resize.
+    local wasFit = zoomScale == fitZoom
+    fitInsetR = hasSlider and SLIDER_CLEAR or 0
+    fitZoom = math.max(MIN_ZOOM, math.min((vw - fitInsetR) / cw, vh / ch))
+    if wasFit then zoomScale = fitZoom end
+    local resized = vw ~= contentW or vh ~= contentH or cw ~= canvasW or ch ~= canvasH
+    contentW, contentH = vw, vh
+    canvasW, canvasH = cw, ch
+    sliderH = winH - ACE_FRAME_TOP_INSET - bottomInset - topPad
+
     content:ClearAllPoints()
-    -- Shifted right by the gutter: the slider column sits to the *left* of
-    -- the art (see the sliderCol anchor below), so its room has to be
-    -- carved out of content's own left edge here rather than added past
-    -- the right one.
-    content:SetPoint("TOPLEFT", aceWindow.content, "TOPLEFT", gutter, -topPad)
-    contentW, contentH = w, h
-    content:SetSize(w, h)
-    -- canvasScale tracks content's own size exactly, so RenderTiles and
-    -- RenderContinuousPieces can read canvasScale:GetSize() for the plain,
-    -- zoom-unaware pixel math they've always done. Since w/h can change
-    -- floor to floor (each art layer has its own aspect ratio) or on a
-    -- world map resize, the previous pan is re-clamped against the new
-    -- size rather than left pointing at a now-invalid offset.
+    content:SetPoint("TOPLEFT", window, "TOPLEFT", DIALOG_INSET, -DIALOG_INSET)
+    content:SetSize(vw, vh)
+    -- RenderTiles and RenderContinuousPieces read canvasScale:GetSize() for
+    -- the plain, zoom-unaware pixel math they've always done. The size can
+    -- change floor to floor (each art layer has its own aspect ratio) or on
+    -- a world map resize: a fitted view is re-centred, a zoomed one is
+    -- re-clamped, rather than left pointing at a now-invalid offset.
     if canvasScale then
-        canvasScale:SetSize(w, h)
+        canvasScale:SetSize(cw, ch)
+        if resized and zoomScale == fitZoom then CenterPan() end
         ClampPan()
         ApplyCanvasTransform()
         -- zoomAnchorX/Y (see ZoomBy) are canvas-local coordinates measured
-        -- against *this* w/h; a resize invalidates them, so the next wheel
+        -- against *this* size; a resize invalidates them, so the next wheel
         -- notch samples a fresh anchor instead of centering a point that
         -- meant something under the old layout.
         zoomAnchorX, zoomAnchorY = nil, nil
@@ -1985,40 +2197,36 @@ local function LayoutWindow(floorMapID)
 
     -- The Ace3 dialog frame reserves a fixed amount of its own chrome
     -- (title bar, status bar, border; see ACE_FRAME_WIDTH_OVERHEAD/
-    -- ACE_FRAME_TOP_INSET/BOTTOM_INSET) around the content region it hands
-    -- back, so the frame is sized from the content this window actually
-    -- needs -- the art itself plus the depth-slider gutter beside it --
-    -- rather than the other way around.
-    --
-    -- The bottom inset shrinks when the status pane has nothing to show
-    -- (see StatusBarNeeded/ShowCave): `.content`'s own BOTTOMRIGHT point is
-    -- re-anchored here to match, overriding the library's fixed one, so the
-    -- window's own height (and the empty gap that pane would otherwise
-    -- leave behind) shrinks and grows right along with it.
-    local bottomInset = StatusBarNeeded() and ACE_FRAME_BOTTOM_INSET_STATUS
-        or ACE_FRAME_BOTTOM_INSET_NO_STATUS
+    -- ACE_FRAME_TOP_INSET/BOTTOM_INSET) around the `.content` region it
+    -- hands back; that region now only positions the picker and slider.
+    -- `.content`'s own BOTTOMRIGHT point is re-anchored here to match the
+    -- bottom inset, overriding the library's fixed one, so the window's own
+    -- height (and the empty gap the status pane would otherwise leave
+    -- behind) shrinks and grows right along with it.
     aceWindow.content:ClearAllPoints()
     aceWindow.content:SetPoint("TOPLEFT", window, "TOPLEFT", 17, -ACE_FRAME_TOP_INSET)
     aceWindow.content:SetPoint("BOTTOMRIGHT", window, "BOTTOMRIGHT", -17, bottomInset)
 
-    aceWindow:SetWidth(w + gutter + ACE_FRAME_WIDTH_OVERHEAD)
-    aceWindow:SetHeight(h + topPad + ACE_FRAME_TOP_INSET + bottomInset)
+    aceWindow:SetWidth(winW)
+    aceWindow:SetHeight(winH)
     PositionWindow()
 
     if hasSlider then
         EnsureSlider()
         sliderCol:ClearAllPoints()
-        sliderCol:SetPoint("TOPRIGHT", content, "TOPLEFT", -2, 0)
+        sliderCol:SetPoint("TOPRIGHT", aceWindow.content, "TOPRIGHT", -2, -topPad)
+        -- Over the art, not under it.
+        sliderCol:SetFrameLevel(content:GetFrameLevel() + 10)
         -- Height set outright as well as anchored: LayoutHeightWindow needs the
         -- number this frame, and an anchor-derived size is not guaranteed to
         -- be readable yet.
-        sliderCol:SetSize(SLIDER_COL_W, h)
-        sliderTrack:SetHeight(h)
+        sliderCol:SetSize(SLIDER_COL_W, sliderH)
+        sliderTrack:SetHeight(sliderH)
     elseif sliderCol then
         sliderCol:Hide()
     end
 
-    return w, h
+    return cw, ch
 end
 
 -------------------------------------------------------------------------------
@@ -2162,6 +2370,50 @@ local function UpdateCorpsePin()
     corpsePin:Show()
 end
 
+--- Marks where the player came in, so the way out can be found again. Same
+--- floor gate as the player pin; plays a short drop-in when it appears.
+local function UpdateEntrancePin()
+    local e = Config.caveEntrance
+    local w, h = canvasScale:GetSize()
+    if not e or w <= 0 or h <= 0
+       or (not Config.caveFloorFilterAll and e.mapID ~= Config.caveCurrentFloorMapID) then
+        entrancePin:Hide()
+        return
+    end
+    -- Re-anchored only on change: this runs 20x a second, and resetting a
+    -- mouse-enabled frame's anchor under the cursor drops its hover.
+    local x, y = e.x * w, -(e.y * h)
+    if entrancePin.ax ~= x or entrancePin.ay ~= y then
+        entrancePin.ax, entrancePin.ay = x, y
+        entrancePin:ClearAllPoints()
+        entrancePin:SetPoint("CENTER", canvasScale, "TOPLEFT", x, y)
+    end
+    if not entrancePin:IsShown() then
+        entrancePin:Show()
+        entrancePin.intro:Stop() entrancePin.intro:Play()
+        -- Once per visit: the table is replaced on entering a cave.
+        if not e.glinted then
+            e.glinted = true
+            entrancePin.glint:Play()
+        end
+        entrancePin.pulse:Stop() entrancePin.pulse:Play()
+    end
+
+    -- Hover label, polled like the pan drag (CursorOverArt): a frame's own
+    -- OnEnter never fired here, so geometry decides, not mouse focus. Plain
+    -- GameTooltip use on an insecure frame; no taint path. The rect runs 6px
+    -- past the door to be easy to land on.
+    local over = CursorOverArt() and entrancePin:IsMouseOver(6, -6, -6, 6)
+    local owned = GameTooltip:GetOwner() == entrancePin
+    if over and not owned then
+        GameTooltip:SetOwner(entrancePin, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Exit")
+        GameTooltip:Show()
+    elseif owned and not over then
+        GameTooltip:Hide()
+    end
+end
+
 local pinAccum = 0
 local function OnWindowUpdate(_, elapsed)
     if not Config.caveOverlayActive then return end
@@ -2169,6 +2421,7 @@ local function OnWindowUpdate(_, elapsed)
     if pinAccum < PIN_UPDATE_INTERVAL then return end
     pinAccum = 0
     UpdatePlayerPin()
+    UpdateEntrancePin()
     UpdateGroupPins()
     UpdateCorpsePin()
 end
@@ -2523,6 +2776,21 @@ function CaveRenderer:ShowCave(floorMapID)
         or Config.db.caveMapScale or WorldMapFrame:GetScale()
     window:SetScale(keepOpen and mapScale or 1)
     SyncWindowLayer()
+    -- The default state decides the size when the window opens: Fullscreen
+    -- maximises, Windowed restores, Remember brings back whichever it was
+    -- left in. Must land before PositionWindow, which places a maximised
+    -- window. Skipped while already open, so floor switches keep the size
+    -- the player chose.
+    if not Config.caveOverlayActive then
+        local state = Config.db.caveDefaultState
+        if state == "fullscreen" then
+            ApplyMaximized(true)
+        elseif state == "remember" then
+            ApplyMaximized(Config.db.caveMaximized == true)
+        else
+            ApplyMaximized(false)
+        end
+    end
     PositionWindow()
 
     -- Normally Cave:UpdateState has already built this, but ShowCave is also
@@ -2576,26 +2844,22 @@ function CaveRenderer:ShowCave(floorMapID)
     aceWindow:SetTitle(ns.Cave:GetAreaTitle(floorMapID))
     ApplyGameMenuChrome()
 
-    if n > 1 and not StatusBarNeeded() then
-        -- "All" layers every floor together (see InitFloorPickerMenu): with
-        -- no single current level to report, the status bar has nothing
-        -- useful to say, so it's hidden outright rather than left showing
-        -- stale or misleading text. LayoutWindow (above) has already
-        -- shrunk the window's own bottom inset to match.
-        aceWindow:SetStatusText("")
-        if statusbg then statusbg:Hide() end
-    elseif n > 1 then
+    if not drew then
+        aceWindow:SetStatusText("|cffff7777No map art for this area|r")
+        if statusbg then statusbg:Show() end
+    elseif n > 1 and StatusBarNeeded() then
         local idx = FloorIndex(floorMapID) or 1
         local name = floors[idx] and floors[idx].name
         aceWindow:SetStatusText(("Level %d of %d%s"):format(
             idx, n, name and ("  |cff777777" .. name .. "|r") or ""))
         if statusbg then statusbg:Show() end
-    elseif drew then
-        aceWindow:SetStatusText("|cff777777Single level|r")
-        if statusbg then statusbg:Show() end
     else
-        aceWindow:SetStatusText("|cffff7777No map art for this area|r")
-        if statusbg then statusbg:Show() end
+        -- Single-level places, and "All" floors (see InitFloorPickerMenu),
+        -- have no level to report, so the status pane is hidden outright.
+        -- LayoutWindow (above) has already shrunk the window's own bottom
+        -- inset to match.
+        aceWindow:SetStatusText("")
+        if statusbg then statusbg:Hide() end
     end
 
     SyncSlider(floors, floorMapID, continuousActive or piecesActive)
@@ -2679,17 +2943,22 @@ function CaveRenderer:HideCave()
     piecesActive                 = false
     piecesZMin, piecesZMax       = nil, nil
     heightWindowDrag             = nil
+    -- The depth slider's range rectangle goes back to the full span too, so
+    -- the next open (this cave or another) starts showing every floor.
+    Config:SetCaveHeightWindow(1, 0)
     -- Back to fit-to-window: see the module comment above zoomScale/panX/
     -- panY for why ShowCave itself never resets these, but a closed (and
     -- possibly later reopened, possibly on a different cave entirely)
     -- window should not remember a zoom level from a previous visit.
     ResetViewTransform()
+    if window then ApplyMaximized(false) end
     if windowBody then windowBody:Hide() end
     if floorPicker then floorPicker:Hide() end
     if CloseDropDownMenus then pcall(CloseDropDownMenus) end
     if not window then return end
     PoolReleaseAll()  -- also wipes continuousTileGroups and continuousPieceGroups
     if playerPin then playerPin:Hide() end
+    if entrancePin then entrancePin:Hide() end
     if corpsePin then corpsePin:Hide() end
     HideGroupPins(1)
     window:SetScript("OnUpdate", nil)

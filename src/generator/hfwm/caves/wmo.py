@@ -67,6 +67,12 @@ def parse_wmo_groups(wmo_root_bytes: bytes,
     return groups
 
 
+def parse_wmo_id(wmo_root_bytes: bytes) -> int:
+    """The ``wmoID`` field of MOHD: the key WMOAreaTable rows use."""
+    mohd = dict(_iter_chunks(wmo_root_bytes))["MOHD"]
+    return struct.unpack_from("<I", mohd, 32)[0]
+
+
 @dataclass
 class WmoPlacement:
     unique_id: int

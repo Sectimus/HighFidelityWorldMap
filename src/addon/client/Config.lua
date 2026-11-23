@@ -37,24 +37,21 @@ Config.DEFAULTS = {
     -- caveAutoOpen: show the window the instant a tracked cave is entered.
     -- Off means it waits at the reopen icon instead, until clicked.
     --
-    -- caveRememberState: reproduce whichever of open/closed the window was
-    -- left as last time, instead of the fixed rule above. Wins over
-    -- caveAutoOpen when both apply.
-    --
-    -- caveLastVisible: true if the window's last state change was being
-    -- shown; false if the player closed it. Only read when
-    -- caveRememberState is on, but tracked unconditionally.
-    -- caveKeepOpen: the window stays up after the world map is closed
-    -- instead of closing with it.
+    -- caveDefaultState: how the window opens. "minimized" (reopen icon),
+    -- "windowed" (normal size), "fullscreen" (maximised over the world map),
+    -- or "remember" (reproduce open/closed and maximised/restored as last
+    -- left, which takes over from caveAutoOpen when set). caveLastVisible
+    -- tracks open/closed; caveMaximized tracks the size.
     caveAutoOpen      = true,
-    caveRememberState = false,
+    caveDefaultState  = "windowed",
     caveLastVisible   = true,
+    caveMaximized     = false,
     caveKeepOpen      = false,
 
     -- caveOtherIndoors: also open the window for buildings, houses and
-    -- every other WMO interior (places the generator marks kind = "indoor"),
-    -- not just caves, mines and dungeons. Off by default: there are far more
-    -- of them and most are one-room houses.
+    -- every other WMO interior (places the generator marks kind = "indoor"
+    -- without cave = true), not just caves, mines and dungeons. Off by
+    -- default: there are far more of them and most are one-room houses.
     caveOtherIndoors  = false,
 
     -- Instance map: the same window inside dungeon ("party") and raid
@@ -1010,6 +1007,13 @@ Config.caveSuppressedKey     = nil   -- map group the user closed; don't reopen 
 -- Remember State for, this visit. Cleared unconditionally on every
 -- "player is not in a cave" tick, same moment as caveSuppressedKey.
 Config.caveDecidedKey        = nil
+-- Where the player entered this visit: { key, mapID, x, y } (x/y in that
+-- floor's map space), or nil. Same table as dbObj.char.caveEntrance, so it
+-- persists across /reload and logout; see Cave:UpdateState.
+Config.caveEntrance          = nil
+-- A "player is outside any cave" was seen this session, so an entry is a
+-- crossing we watched rather than a login that landed inside.
+Config.caveSawOutside        = false
 -- ESC hid the window (see Core.lua). Unlike caveSuppressedKey it is not a
 -- "closed" decision: no reopen icon, no Remember State write. Holds the
 -- window down until the world map is next shown or the player leaves.
@@ -1120,6 +1124,21 @@ local function MigrateExperimentalDefaults(dbObj)
     global.migrations = MIGRATION_EXPERIMENTAL_OFF
 end
 
+--- The Remember state toggle became the Default state dropdown's "Remember"
+--- choice. Carry over profiles that had it on, once per account.
+local MIGRATION_DEFAULT_STATE = 3
+local function MigrateCaveDefaultState(dbObj)
+    local global = dbObj.global
+    if (global.migrations or 0) >= MIGRATION_DEFAULT_STATE then return end
+    for _, profile in pairs(dbObj.profiles) do
+        if profile.caveRememberState then
+            profile.caveDefaultState = "remember"
+        end
+        profile.caveRememberState = nil
+    end
+    global.migrations = MIGRATION_DEFAULT_STATE
+end
+
 --- Create the AceDB-3.0 database after ADDON_LOADED (see Core.lua's
 --- OnInitialize). `true` as the default profile shares one profile across
 --- every character by default, matching this addon's behavior before
@@ -1143,4 +1162,5 @@ function Config:InitDB()
     self.db = self.dbObj.profile
     MigrateBackgroundKeys(self.db)
     MigrateExperimentalDefaults(self.dbObj)
+    MigrateCaveDefaultState(self.dbObj)
 end
