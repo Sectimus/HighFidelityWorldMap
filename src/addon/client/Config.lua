@@ -37,20 +37,14 @@ Config.DEFAULTS = {
     -- caveAutoOpen: show the window the instant a tracked cave is entered.
     -- Off means it waits at the reopen icon instead, until clicked.
     --
-    -- caveRememberState: reproduce whichever of open/closed the window was
-    -- left as last time, instead of the fixed rule above. Wins over
-    -- caveAutoOpen when both apply.
-    --
-    -- caveLastVisible: true if the window's last state change was being
-    -- shown; false if the player closed it. Only read when
-    -- caveRememberState is on, but tracked unconditionally.
-    -- caveKeepOpen: the window stays up after the world map is closed
-    -- instead of closing with it.
+    -- caveDefaultState: how the window opens. "minimized" (reopen icon),
+    -- "windowed" (normal size), "fullscreen" (maximised over the world map),
+    -- or "remember" (reproduce open/closed and maximised/restored as last
+    -- left, which takes over from caveAutoOpen when set). caveLastVisible
+    -- tracks open/closed; caveMaximized tracks the size.
     caveAutoOpen      = true,
-    caveRememberState = false,
+    caveDefaultState  = "windowed",
     caveLastVisible   = true,
-    -- caveMaximized: whether the window was maximised when the player last
-    -- left it. Restored on show, but only when caveRememberState is on.
     caveMaximized     = false,
     caveKeepOpen      = false,
 
@@ -1130,6 +1124,21 @@ local function MigrateExperimentalDefaults(dbObj)
     global.migrations = MIGRATION_EXPERIMENTAL_OFF
 end
 
+--- The Remember state toggle became the Default state dropdown's "Remember"
+--- choice. Carry over profiles that had it on, once per account.
+local MIGRATION_DEFAULT_STATE = 3
+local function MigrateCaveDefaultState(dbObj)
+    local global = dbObj.global
+    if (global.migrations or 0) >= MIGRATION_DEFAULT_STATE then return end
+    for _, profile in pairs(dbObj.profiles) do
+        if profile.caveRememberState then
+            profile.caveDefaultState = "remember"
+        end
+        profile.caveRememberState = nil
+    end
+    global.migrations = MIGRATION_DEFAULT_STATE
+end
+
 --- Create the AceDB-3.0 database after ADDON_LOADED (see Core.lua's
 --- OnInitialize). `true` as the default profile shares one profile across
 --- every character by default, matching this addon's behavior before
@@ -1153,4 +1162,5 @@ function Config:InitDB()
     self.db = self.dbObj.profile
     MigrateBackgroundKeys(self.db)
     MigrateExperimentalDefaults(self.dbObj)
+    MigrateCaveDefaultState(self.dbObj)
 end

@@ -872,9 +872,12 @@ function Cave:UpdateState()
             end
         end
         Config.caveEntrance = char.caveEntrance
+        local state = Config.db.caveDefaultState
         local openByDefault
-        if Config.db.caveRememberState then
+        if state == "remember" then
             openByDefault = Config.db.caveLastVisible ~= false
+        elseif state == "minimized" then
+            openByDefault = false
         else
             openByDefault = Config.db.caveAutoOpen ~= false
         end

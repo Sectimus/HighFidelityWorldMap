@@ -82,6 +82,10 @@ local ACE_FRAME_BOTTOM_INSET_NO_STATUS = 20  -- tighter: no pane to leave room f
 local PIN_GAP = 6
 local SLIDER_COL_W = 30   -- depth slider gutter, only when there are floors
 local SLIDER_W     = 16   -- the track itself: a stock scroll bar's width
+-- Clearance kept free on the right of the fitted view for the depth slider
+-- (its column plus the 2px inset it sits in), so a freshly fitted cave never
+-- opens underneath it.
+local SLIDER_CLEAR = SLIDER_COL_W + 2
 -- The thumb never reaches the very ends of a vertical Slider's track (half
 -- its height is always inside it), so anything else meant to track a
 -- fraction of the track (the height-window rectangle) has to live inside the
@@ -222,6 +226,9 @@ local statusbg      -- aceWindow.statustext's own parent frame (the pane
 -- `heightWindowDrag` below (OnMouseDown to start, OnUpdate plus a live
 -- IsMouseButtonDown check to follow and to notice release).
 local zoomScale    = FIT_ZOOM
+-- Right-hand gutter (px) the initial fit leaves clear for the depth slider;
+-- 0 when the cave has no slider. Set by LayoutWindow, read by CenterPan.
+local fitInsetR    = 0
 local panX, panY   = 0, 0
 local contentDrag
 
@@ -523,7 +530,7 @@ end
 --- (which hides the status pane itself) so the two can never disagree
 --- about which state the window is in.
 local function StatusBarNeeded()
-    return not (FloorCount() > 1 and Config.caveFloorFilterAll)
+    return FloorCount() > 1 and not Config.caveFloorFilterAll
 end
 
 --- Step the active floor by `delta` indices, clamped. Index 1 is the topmost
@@ -1406,6 +1413,11 @@ local function CursorOverArt()
     if floorPicker and floorPicker:IsShown() and floorPicker:IsMouseOver() then
         return false
     end
+    -- The depth slider is drawn over the art's right edge; a press on it is
+    -- a slider interaction, not a pan.
+    if sliderCol and sliderCol:IsShown() and sliderCol:IsMouseOver() then
+        return false
+    end
     local list = _G.DropDownList1
     return not (list and list:IsShown() and list:IsMouseOver())
 end
@@ -1428,7 +1440,7 @@ end
 
 --- Canvas centred in the viewport at the current zoom.
 function CenterPan()
-    panX = (contentW - canvasW * zoomScale) / 2
+    panX = (contentW - fitInsetR - canvasW * zoomScale) / 2
     panY = (canvasH * zoomScale - contentH) / 2
 end
 
@@ -1897,7 +1909,7 @@ local function EnsureWindow()
         ZoomBy(dir > 0 and ZOOM_STEP or (1 / ZOOM_STEP))
     end)
     content:SetScript("OnMouseDown", function(_, button)
-        if button == "LeftButton" then BeginContentPan() end
+        if button == "LeftButton" and CursorOverArt() then BeginContentPan() end
     end)
     content:SetScript("OnUpdate", ContentPanUpdate)
     -- Same wheel handler on the window, gated on the cursor being over the
@@ -2144,7 +2156,12 @@ local function LayoutWindow(floorMapID)
     -- it (cropping whatever overflows, behind the chrome) instead of sitting
     -- in a box inside it.
     local vw, vh = winW - 2 * DIALOG_INSET, winH - 2 * DIALOG_INSET
-    local cw, ch = vw, vw / aspect
+    -- The art is fitted into the viewport minus the depth slider's gutter, so
+    -- the initial view starts clear of the slider. Panning or zooming can
+    -- still bring the art under it.
+    fitInsetR = hasSlider and SLIDER_CLEAR or 0
+    local fitW = vw - fitInsetR
+    local cw, ch = fitW, fitW / aspect
     if ch < vh then
         ch = vh
         cw = vh * aspect
@@ -2755,10 +2772,20 @@ function CaveRenderer:ShowCave(floorMapID)
         or Config.db.caveMapScale or WorldMapFrame:GetScale()
     window:SetScale(keepOpen and mapScale or 1)
     SyncWindowLayer()
-    -- Remember State also brings back maximised/restored, as it was left.
-    -- Must land before PositionWindow, which places a maximised window.
-    if Config.db.caveRememberState then
-        ApplyMaximized(Config.db.caveMaximized == true)
+    -- The default state decides the size when the window opens: Fullscreen
+    -- maximises, Windowed restores, Remember brings back whichever it was
+    -- left in. Must land before PositionWindow, which places a maximised
+    -- window. Skipped while already open, so floor switches keep the size
+    -- the player chose.
+    if not Config.caveOverlayActive then
+        local state = Config.db.caveDefaultState
+        if state == "fullscreen" then
+            ApplyMaximized(true)
+        elseif state == "remember" then
+            ApplyMaximized(Config.db.caveMaximized == true)
+        else
+            ApplyMaximized(false)
+        end
     end
     PositionWindow()
 
@@ -2813,26 +2840,22 @@ function CaveRenderer:ShowCave(floorMapID)
     aceWindow:SetTitle(ns.Cave:GetAreaTitle(floorMapID))
     ApplyGameMenuChrome()
 
-    if n > 1 and not StatusBarNeeded() then
-        -- "All" layers every floor together (see InitFloorPickerMenu): with
-        -- no single current level to report, the status bar has nothing
-        -- useful to say, so it's hidden outright rather than left showing
-        -- stale or misleading text. LayoutWindow (above) has already
-        -- shrunk the window's own bottom inset to match.
-        aceWindow:SetStatusText("")
-        if statusbg then statusbg:Hide() end
-    elseif n > 1 then
+    if not drew then
+        aceWindow:SetStatusText("|cffff7777No map art for this area|r")
+        if statusbg then statusbg:Show() end
+    elseif n > 1 and StatusBarNeeded() then
         local idx = FloorIndex(floorMapID) or 1
         local name = floors[idx] and floors[idx].name
         aceWindow:SetStatusText(("Level %d of %d%s"):format(
             idx, n, name and ("  |cff777777" .. name .. "|r") or ""))
         if statusbg then statusbg:Show() end
-    elseif drew then
-        aceWindow:SetStatusText("|cff777777Single level|r")
-        if statusbg then statusbg:Show() end
     else
-        aceWindow:SetStatusText("|cffff7777No map art for this area|r")
-        if statusbg then statusbg:Show() end
+        -- Single-level places, and "All" floors (see InitFloorPickerMenu),
+        -- have no level to report, so the status pane is hidden outright.
+        -- LayoutWindow (above) has already shrunk the window's own bottom
+        -- inset to match.
+        aceWindow:SetStatusText("")
+        if statusbg then statusbg:Hide() end
     end
 
     SyncSlider(floors, floorMapID, continuousActive or piecesActive)

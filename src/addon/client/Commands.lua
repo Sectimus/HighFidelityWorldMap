@@ -67,12 +67,8 @@ function Commands:Handle(msg)
             ns.Options:Refresh()
             return
         elseif sub == "remember" then
-            local want = args[3]
-            if want == "on" then db.caveRememberState = true
-            elseif want == "off" then db.caveRememberState = false
-            else db.caveRememberState = not db.caveRememberState end
-            P(("Cave map remember state: %s"):format(
-                db.caveRememberState and "|cff00ff00on|r" or "|cffff4444off|r"))
+            db.caveDefaultState = "remember"
+            P("Cave map default state: |cff00ff00Remember|r")
             ns.Options:Refresh()
             return
         elseif sub == "indoors" then

@@ -1210,17 +1210,25 @@ local options = {
                     get = function() return Config.db.caveAutoOpen end,
                     set = function(_, value) Config.db.caveAutoOpen = value end,
                 },
-                caveRememberState = {
+                caveDefaultState = {
                     order = 30,
-                    type = "toggle",
-                    name = "Remember state",
-                    desc = "Reopens the cave map only if it was open when "
-                        .. "you last closed one. Takes over from Open "
-                        .. "Automatically when the two disagree.",
+                    type = "select",
+                    name = "Default state",
+                    desc = "How the cave map opens. Minimized starts as the "
+                        .. "reopen icon, Windowed at normal size, Fullscreen "
+                        .. "maximised over the world map. Remember reproduces "
+                        .. "whichever state, open or closed, you left it in last time.",
                     disabled = function() return not (Config.db.enabled and Config.db.caveEnabled) end,
-                    get = function() return Config.db.caveRememberState end,
+                    values = {
+                        minimized = "Minimized",
+                        windowed = "Windowed",
+                        fullscreen = "Fullscreen",
+                        remember = "Remember",
+                    },
+                    sorting = { "minimized", "windowed", "fullscreen", "remember" },
+                    get = function() return Config.db.caveDefaultState end,
                     set = function(_, value)
-                        Config.db.caveRememberState = value
+                        Config.db.caveDefaultState = value
                     end,
                 },
                 caveKeepOpen = {
@@ -1516,7 +1524,7 @@ local SUB_PAGES = {
     { key = "areaLabels", title = "Area Labels",
       keys = AREA_LABEL_PAGE_KEYS },
     { key = "cave", title = "Cave Map",
-      keys = { "caveEnabled", "caveAutoOpen", "caveRememberState",
+      keys = { "caveEnabled", "caveAutoOpen", "caveDefaultState",
                "caveKeepOpen", "cavePlacement", "caveOtherIndoors",
                "caveAlpha", "caveWindowScale", "caveWindowPoint" } },
     { key = "instance", title = "|cffff8800!|r Instance Map",
