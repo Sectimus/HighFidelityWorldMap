@@ -96,6 +96,9 @@ local HEIGHT_WINDOW_HANDLE_H = 8
 -- fixed per-piece margin. Not user-adjustable; the window rectangle itself
 -- is the adjustable control now.
 local EDGE_FADE_YARDS = 2
+-- Right-hand margin, in UI pixels, kept clear of the quest objective tracker
+-- button when the window is maximised (WorldMapFrame.SidePanelToggle).
+local MAXIMIZED_RIGHT_PAD = 35
 -- Fraction of the map frame the content is allowed to eat. A cave map that
 -- covers the zone it is a hole in defeats the point of being a window, so
 -- this is what governs that: the window grows and shrinks with the map, so
@@ -2110,6 +2113,11 @@ local function LayoutWindow(floorMapID)
         local pane = WorldMapFrame.ScrollContainer or WorldMapFrame
         local k = pane:GetEffectiveScale() / window:GetEffectiveScale()
         local pw, ph = pane:GetWidth() * k, pane:GetHeight() * k
+        -- Leave a right-hand margin so the window never runs under the quest
+        -- objective tracker's open button (WorldMapFrame.SidePanelToggle).
+        -- 30 UI pixels, converted into this window's own units.
+        local padR = MAXIMIZED_RIGHT_PAD * UIParent:GetEffectiveScale() / window:GetEffectiveScale()
+        pw = pw - padR
         if pw > 0 and ph > 0 then winW, winH = pw, ph end
     end
     if not winW then
