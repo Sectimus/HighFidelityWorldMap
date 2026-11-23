@@ -49,6 +49,9 @@ Config.DEFAULTS = {
     caveAutoOpen      = true,
     caveRememberState = false,
     caveLastVisible   = true,
+    -- caveMaximized: whether the window was maximised when the player last
+    -- left it. Restored on show, but only when caveRememberState is on.
+    caveMaximized     = false,
     caveKeepOpen      = false,
 
     -- caveOtherIndoors: also open the window for buildings, houses and
@@ -1010,6 +1013,13 @@ Config.caveSuppressedKey     = nil   -- map group the user closed; don't reopen 
 -- Remember State for, this visit. Cleared unconditionally on every
 -- "player is not in a cave" tick, same moment as caveSuppressedKey.
 Config.caveDecidedKey        = nil
+-- Where the player entered this visit: { key, mapID, x, y } (x/y in that
+-- floor's map space), or nil. Same table as dbObj.char.caveEntrance, so it
+-- persists across /reload and logout; see Cave:UpdateState.
+Config.caveEntrance          = nil
+-- A "player is outside any cave" was seen this session, so an entry is a
+-- crossing we watched rather than a login that landed inside.
+Config.caveSawOutside        = false
 -- ESC hid the window (see Core.lua). Unlike caveSuppressedKey it is not a
 -- "closed" decision: no reopen icon, no Remember State write. Holds the
 -- window down until the world map is next shown or the player leaves.
